@@ -1,7 +1,7 @@
-import { BookOpenCheck, Network } from 'lucide-react'
+import { BookOpenCheck, Network, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type AppModuleId = 'architecture' | 'question-bank'
+export type AppModuleId = 'architecture' | 'question-bank' | 'troubleshooting'
 
 export type AppModule = {
   id: AppModuleId
@@ -29,8 +29,18 @@ export const appModules: AppModule[] = [
     path: '#/question-bank',
     icon: BookOpenCheck,
   },
+  {
+    id: 'troubleshooting',
+    name: 'DBA 故障诊断案例库',
+    shortName: '故障案例',
+    description: '数据库故障案例、排查步骤与关键命令',
+    path: '#/troubleshooting',
+    icon: Siren,
+  },
 ]
 
 export function getModuleFromHash(hash: string): AppModuleId {
-  return hash.includes('question-bank') ? 'question-bank' : 'architecture'
+  if (hash.includes('troubleshooting')) return 'troubleshooting'
+  if (hash.includes('question-bank')) return 'question-bank'
+  return 'architecture'
 }

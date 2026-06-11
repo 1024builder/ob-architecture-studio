@@ -4,6 +4,7 @@ import { AppShell } from './app/AppShell'
 import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
 import { ArchitecturePage } from './pages/ArchitecturePage'
 import { QuestionBankPage } from './pages/QuestionBankPage'
+import { TroubleshootingPage } from './pages/TroubleshootingPage'
 
 function App() {
   const [activeModule, setActiveModule] = useState<AppModuleId>(() => getModuleFromHash(window.location.hash))
@@ -31,14 +32,16 @@ function App() {
 
   return (
     <AppShell activeModule={activeModule} onModuleChange={handleModuleChange}>
-      {activeModule === 'architecture'
-        ? (
+      {activeModule === 'architecture' ? (
           <ArchitecturePage
             navigationRequest={architectureRequest}
             onNavigationHandled={handleArchitectureNavigationHandled}
           />
-        )
-        : <QuestionBankPage onViewArchitectureComponent={handleArchitectureComponent} />}
+        ) : activeModule === 'question-bank' ? (
+          <QuestionBankPage onViewArchitectureComponent={handleArchitectureComponent} />
+        ) : (
+          <TroubleshootingPage />
+        )}
     </AppShell>
   )
 }
