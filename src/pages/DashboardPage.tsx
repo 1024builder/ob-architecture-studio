@@ -13,7 +13,7 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { AppModuleId } from '../app/modules'
 import { architectureModels } from '../data/models'
 import { obcpQuestions } from '../data/obcpQuestions'
@@ -23,7 +23,7 @@ import {
   loadCustomObcpQuestions,
   mergeObcpQuestions,
 } from '../utils/obcpQuestionImportExport'
-import { loadObcpUserState } from '../utils/obcpStorage'
+import { loadObcpUserState, OBCP_DATA_UPDATED_EVENT } from '../utils/obcpStorage'
 import {
   loadCustomTroubleshootingCases,
   mergeTroubleshootingCases,
@@ -36,7 +36,15 @@ type Props = {
 }
 
 export function DashboardPage({ onModuleChange }: Props) {
+  const [dataRevision, setDataRevision] = useState(0)
+  useEffect(() => {
+    const refreshDashboard = () => setDataRevision((value) => value + 1)
+    window.addEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+    return () => window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+  }, [])
+
   const dashboardData = useMemo(() => {
+    void dataRevision
     const allQuestions = mergeObcpQuestions(obcpQuestions, loadCustomObcpQuestions())
     const userState = loadObcpUserState(CURRENT_USER_ID)
     const analytics = calculateObcpAnalytics(userState, allQuestions)
@@ -58,7 +66,7 @@ export function DashboardPage({ onModuleChange }: Props) {
         componentTypeCount: new Set(allNodes.map((node) => node.componentId)).size,
       },
     }
-  }, [])
+  }, [dataRevision])
 
   const { analytics, allQuestions, allCases, recentCase, architecture } = dashboardData
   const { userSummary } = analytics

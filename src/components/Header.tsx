@@ -1,5 +1,6 @@
-import { Activity, Cpu } from 'lucide-react'
+import { Cpu } from 'lucide-react'
 import { appModules, type AppModuleId } from '../app/modules'
+import { UserSyncStatus } from './auth/UserSyncStatus'
 
 type Props = {
   activeModule: AppModuleId
@@ -40,10 +41,7 @@ export function Header({ activeModule, onModuleChange }: Props) {
           })}
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 md:flex">
-          <Activity size={16} />
-          <span>Learning Lab</span>
-        </div>
+        <UserSyncStatus />
       </div>
     </header>
   )

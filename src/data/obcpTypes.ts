@@ -1,6 +1,7 @@
 export type ObcpQuestionType = 'single' | 'multiple' | 'trueFalse'
 export type ObcpDifficulty = '基础' | '进阶' | '高级'
 export type ObcpPracticeMode = 'sequential' | 'random' | 'exam' | 'wrongBook' | 'favorite'
+export type ObcpSyncStatus = 'pending' | 'synced'
 
 export type ObcpPracticeQuestionState = {
   selectedAnswer: string[]
@@ -51,6 +52,8 @@ export type ObcpAnswerRecord = {
   isWrongBook: boolean
   retryCount: number
   isNotUnderstood: boolean
+  syncStatus?: ObcpSyncStatus
+  syncedAt?: string
 }
 
 export type ObcpUserState = {
@@ -59,6 +62,21 @@ export type ObcpUserState = {
   favoriteQuestionIds: string[]
   wrongBookQuestionIds: string[]
   notUnderstoodQuestionIds: string[]
+  questionStateUpdatedAt: Record<string, string>
+}
+
+export type ObcpPracticeSession = {
+  id: string
+  userId: string
+  mode: ObcpPracticeMode
+  sourceLabel: string
+  questionIds: string[]
+  answeredCount: number
+  correctCount: number
+  startedAt: string
+  completedAt: string
+  syncStatus?: ObcpSyncStatus
+  syncedAt?: string
 }
 
 export type StatBucket = {

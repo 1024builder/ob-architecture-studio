@@ -1,11 +1,11 @@
 {
   "name": "ob-architecture-studio",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && node scripts/prepare-build.mjs && node_modules\\@esbuild\\win32-x64\\esbuild.exe src/main.tsx --bundle --minify --format=esm --outfile=dist/assets/index.js --external:./index.css --define:process.env.NODE_ENV=\\\"production\\\" && tailwindcss -i src/index.css -o dist/assets/index.css --minify",
     "lint": "eslint .",
     "preview": "vite preview"
   },

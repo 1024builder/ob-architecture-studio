@@ -12,6 +12,12 @@ await writeFile(
     <meta name="description" content="OceanBase 架构原理交互式分析与 OBCP 学习平台" />
     <title>OB Architecture Studio</title>
     <link rel="stylesheet" href="./assets/index.css" />
+    <script>
+      window.__OB_STUDIO_CONFIG__ = {
+        supabaseUrl: ${JSON.stringify(process.env.VITE_SUPABASE_URL ?? '')},
+        supabaseAnonKey: ${JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY ?? '')}
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

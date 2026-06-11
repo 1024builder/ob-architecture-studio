@@ -2,7 +2,7 @@
 
 OB Architecture Studio 是一个 OceanBase 架构学习、交互式拓扑分析与 OBCP 题库练习平台。
 
-项目通过可交互架构拓扑、组件知识说明、在线刷题和学习诊断，辅助用户理解 OceanBase 架构关系并进行 OBCP 知识练习。当前版本为纯前端应用，用户学习数据保存在浏览器 localStorage 中。
+项目通过可交互架构拓扑、组件知识说明、在线刷题和学习诊断，辅助用户理解 OceanBase 架构关系并进行 OBCP 知识练习。默认使用浏览器 localStorage；配置 Supabase 后，登录用户可跨设备同步 OBCP 学习数据。
 
 ## 当前核心功能
 
@@ -88,6 +88,21 @@ npm run build
 ```
 
 构建产物输出到 `dist/` 目录。
+
+## Supabase 登录与 OBCP 同步
+
+复制 `.env.example` 为 `.env.local`，填写：
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+```
+
+在 Supabase SQL Editor 中执行 `docs/supabase-obcp-sync.sql`，创建数据表和 RLS 策略。
+
+当前支持邮箱 Magic Link 登录。登录后会合并本地与云端 OBCP 答题记录、题目状态和练习会话，并支持手动同步。同步失败不会删除或阻断本地记录。
+
+未配置环境变量时，顶部显示“本地模式”，应用不会发起 Supabase 请求。
 
 ## 项目目录
 

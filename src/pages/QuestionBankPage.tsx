@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { QuestionBankManager } from '../components/obcp/QuestionBankManager'
 import { QuestionPractice } from '../components/obcp/QuestionPractice'
 import { LearningDiagnosisReport } from '../components/obcp/LearningDiagnosisReport'
@@ -14,7 +14,9 @@ import {
 } from '../utils/obcpQuestionImportExport'
 import {
   appendAnswerRecords,
+  appendObcpPracticeSession,
   loadObcpUserState,
+  OBCP_DATA_UPDATED_EVENT,
   saveObcpUserState,
   toggleFavorite,
   toggleNotUnderstood,
@@ -47,6 +49,12 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
     () => calculateObcpAnalytics(userState, allQuestions),
     [userState, allQuestions],
   )
+
+  useEffect(() => {
+    const reloadSyncedData = () => setUserState(loadObcpUserState(CURRENT_USER_ID))
+    window.addEventListener(OBCP_DATA_UPDATED_EVENT, reloadSyncedData)
+    return () => window.removeEventListener(OBCP_DATA_UPDATED_EVENT, reloadSyncedData)
+  }, [])
 
   function updateUserState(updater: (current: typeof userState) => typeof userState) {
     setUserState((current) => {
@@ -97,6 +105,7 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
           }}
           onViewDiagnosis={() => setDiagnosisOpen(true)}
           onViewArchitectureComponent={onViewArchitectureComponent}
+          onSessionComplete={appendObcpPracticeSession}
           onClose={() => setActivePractice(null)}
         />
         {diagnosisOpen && <LearningDiagnosisReport analytics={analytics} onClose={() => setDiagnosisOpen(false)} onViewArchitectureComponent={onViewArchitectureComponent} />}

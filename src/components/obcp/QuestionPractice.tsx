@@ -15,6 +15,7 @@ import type {
   ObcpAnswerRecord,
   ObcpPracticeMode,
   ObcpPracticeQuestionState,
+  ObcpPracticeSession,
   ObcpQuestion,
   ObcpUserState,
 } from '../../data/obcpTypes'
@@ -32,6 +33,7 @@ type Props = {
   onRetryWrong: (questionIds: string[]) => void
   onViewDiagnosis: () => void
   onViewArchitectureComponent: (componentName: string) => void
+  onSessionComplete: (session: ObcpPracticeSession) => void
   onClose: () => void
 }
 
@@ -47,6 +49,7 @@ export function QuestionPractice({
   onRetryWrong,
   onViewDiagnosis,
   onViewArchitectureComponent,
+  onSessionComplete,
   onClose,
 }: Props) {
   const [index, setIndex] = useState(0)
@@ -57,6 +60,7 @@ export function QuestionPractice({
   const [examCompleted, setExamCompleted] = useState(false)
   const [practiceCompleted, setPracticeCompleted] = useState(false)
   const [examConfirmOpen, setExamConfirmOpen] = useState(false)
+  const sessionStartedAt = useRef(new Date().toISOString())
   const startedAtByQuestion = useRef<Record<string, number>>({ [questions[0].questionId]: Date.now() })
   const question = questions[index]
   const currentState = questionStates[question.questionId]
@@ -149,8 +153,37 @@ export function QuestionPractice({
     if (!isExam || examCompleted) return
     const records = questions.map((item) => createRecord(item, questionStates[item.questionId]))
     onRecords(records)
+    onSessionComplete(createSessionSummary(records))
     setExamRecords(records)
     setExamCompleted(true)
+  }
+
+  function completePractice() {
+    const records = questions.flatMap((item) => {
+      const state = questionStates[item.questionId]
+      if (!state.submitted) return []
+      return [{
+        isCorrect: state.isCorrect === true,
+      }]
+    })
+    onSessionComplete(createSessionSummary(records))
+    setPracticeCompleted(true)
+  }
+
+  function createSessionSummary(records: Array<{ isCorrect: boolean }>): ObcpPracticeSession {
+    const completedAt = new Date().toISOString()
+    return {
+      id: `${userState.userId}-session-${Date.now()}`,
+      userId: userState.userId,
+      mode,
+      sourceLabel,
+      questionIds: questions.map((item) => item.questionId),
+      answeredCount: records.length,
+      correctCount: records.filter((record) => record.isCorrect).length,
+      startedAt: sessionStartedAt.current,
+      completedAt,
+      syncStatus: 'pending',
+    }
   }
 
   if (practiceCompleted) {
@@ -307,7 +340,7 @@ export function QuestionPractice({
                     提交试卷
                   </button>
                 ) : (
-                  <button type="button" onClick={() => index < questions.length - 1 ? goToQuestion(index + 1) : setPracticeCompleted(true)} className="flex h-10 items-center gap-1 rounded-md bg-ocean-600 px-4 text-sm font-semibold text-white hover:bg-ocean-700">
+                  <button type="button" onClick={() => index < questions.length - 1 ? goToQuestion(index + 1) : completePractice()} className="flex h-10 items-center gap-1 rounded-md bg-ocean-600 px-4 text-sm font-semibold text-white hover:bg-ocean-700">
                     {index < questions.length - 1 ? '下一题' : '完成练习'}<ArrowRight size={16} />
                   </button>
                 )}
