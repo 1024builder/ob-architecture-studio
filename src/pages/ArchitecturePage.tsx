@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { resolveArchitectureTarget, type ArchitectureNavigationRequest } from '../app/architectureNavigation'
 import { InfoPanel } from '../components/InfoPanel'
 import { KnowledgeCards } from '../components/KnowledgeCards'
 import { MetricsOverview } from '../components/MetricsOverview'
@@ -7,7 +8,12 @@ import { TopologyCanvas } from '../components/TopologyCanvas'
 import { componentDetails } from '../data/components'
 import { architectureModels } from '../data/models'
 
-export function ArchitecturePage() {
+type Props = {
+  navigationRequest?: ArchitectureNavigationRequest | null
+  onNavigationHandled?: () => void
+}
+
+export function ArchitecturePage({ navigationRequest, onNavigationHandled }: Props) {
   const [activeModelId, setActiveModelId] = useState(architectureModels[0].id)
   const activeModel = useMemo(
     () => architectureModels.find((model) => model.id === activeModelId) ?? architectureModels[0],
@@ -17,6 +23,7 @@ export function ArchitecturePage() {
     architectureModels[0].nodes.find((node) => node.componentId === architectureModels[0].defaultComponentId)?.id
       ?? architectureModels[0].nodes[0].id,
   )
+  const [navigationNotice, setNavigationNotice] = useState('')
   const selectedNode = activeModel.nodes.find((node) => node.id === selectedNodeId) ?? activeModel.nodes[0]
   const selectedDetail = componentDetails[selectedNode.componentId] ?? componentDetails[activeModel.defaultComponentId]
 
@@ -27,8 +34,27 @@ export function ArchitecturePage() {
     setSelectedNodeId(defaultNode.id)
   }
 
+  useEffect(() => {
+    if (!navigationRequest) return
+    const target = resolveArchitectureTarget(navigationRequest.componentName)
+    if (target) {
+      setActiveModelId(target.modelId)
+      setSelectedNodeId(target.nodeId)
+      setNavigationNotice(`已定位到 ${navigationRequest.componentName} 组件`)
+    } else {
+      setNavigationNotice(`建议查看 ${navigationRequest.componentName} 组件`)
+    }
+    onNavigationHandled?.()
+  }, [navigationRequest, onNavigationHandled])
+
   return (
     <div className="space-y-4 p-3 sm:p-4 lg:p-5">
+      {navigationNotice && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-ocean-200 bg-ocean-50 px-4 py-3 text-sm text-ocean-800">
+          <span>{navigationNotice}</span>
+          <button type="button" onClick={() => setNavigationNotice('')} className="text-xs font-semibold text-ocean-700 hover:text-ocean-900">关闭</button>
+        </div>
+      )}
       <ModelSelector models={architectureModels} activeModelId={activeModel.id} onSelect={handleSelectModel} />
       <MetricsOverview model={activeModel} selectedNode={selectedNode} />
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">

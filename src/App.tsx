@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ArchitectureNavigationRequest } from './app/architectureNavigation'
 import { AppShell } from './app/AppShell'
 import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
 import { ArchitecturePage } from './pages/ArchitecturePage'
@@ -6,6 +7,7 @@ import { QuestionBankPage } from './pages/QuestionBankPage'
 
 function App() {
   const [activeModule, setActiveModule] = useState<AppModuleId>(() => getModuleFromHash(window.location.hash))
+  const [architectureRequest, setArchitectureRequest] = useState<ArchitectureNavigationRequest | null>(null)
 
   useEffect(() => {
     const handleHashChange = () => setActiveModule(getModuleFromHash(window.location.hash))
@@ -18,9 +20,16 @@ function App() {
     setActiveModule(moduleId)
   }
 
+  function handleArchitectureComponent(componentName: string) {
+    setArchitectureRequest({ componentName, requestId: Date.now() })
+    handleModuleChange('architecture')
+  }
+
   return (
     <AppShell activeModule={activeModule} onModuleChange={handleModuleChange}>
-      {activeModule === 'architecture' ? <ArchitecturePage /> : <QuestionBankPage />}
+      {activeModule === 'architecture'
+        ? <ArchitecturePage navigationRequest={architectureRequest} onNavigationHandled={() => setArchitectureRequest(null)} />
+        : <QuestionBankPage onViewArchitectureComponent={handleArchitectureComponent} />}
     </AppShell>
   )
 }

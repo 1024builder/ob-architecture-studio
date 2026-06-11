@@ -5,9 +5,10 @@ import { LearningDiagnosisExport } from './LearningDiagnosisExport'
 type Props = {
   analytics: ObcpAnalytics
   onClose: () => void
+  onViewArchitectureComponent: (componentName: string) => void
 }
 
-export function LearningDiagnosisReport({ analytics, onClose }: Props) {
+export function LearningDiagnosisReport({ analytics, onClose, onViewArchitectureComponent }: Props) {
   const { userSummary } = analytics
 
   return (
@@ -62,7 +63,13 @@ export function LearningDiagnosisReport({ analytics, onClose }: Props) {
           </section>
 
           <section className="grid gap-4 lg:grid-cols-2">
-            <KnowledgeList title="薄弱知识点 Top 5" items={analytics.weakPoints} tone="weak" />
+            <KnowledgeList
+              title="薄弱知识点 Top 5"
+              items={analytics.weakPoints}
+              tone="weak"
+              componentMap={new Map(analytics.weakPointDiagnoses.map((item) => [item.name, item.relatedComponents]))}
+              onViewArchitectureComponent={onViewArchitectureComponent}
+            />
             <KnowledgeList title="已掌握知识点 Top 5" items={analytics.strongPoints} tone="strong" />
           </section>
 
@@ -90,7 +97,7 @@ export function LearningDiagnosisReport({ analytics, onClose }: Props) {
                   <div key={item.name} className="rounded-md bg-slate-50 p-3">
                     <div className="flex items-center justify-between gap-3"><span className="text-sm font-semibold text-ink">{item.name}</span><span className="text-sm font-semibold text-amber-700">{item.correctRate}%</span></div>
                     <p className="mt-2 text-xs leading-5 text-slate-600">{item.reasons.join('；')}</p>
-                    <p className="mt-1 text-xs leading-5 text-ocean-700">关联架构组件：{item.relatedComponents.join('、') || '暂无'}</p>
+                    {!!item.relatedComponents.length && <ArchitectureComponentTags components={item.relatedComponents} onSelect={onViewArchitectureComponent} />}
                   </div>
                 )) : <p className="text-sm text-slate-400">有效样本不足，继续完成章节练习后会生成原因推测。</p>}
               </div>
@@ -111,7 +118,19 @@ function Metric({ icon: Icon, label, value }: { icon: typeof CheckCircle2; label
   return <div className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-4 shadow-sm"><span className="grid h-10 w-10 place-items-center rounded-md bg-ocean-50 text-ocean-600"><Icon size={18} /></span><div><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-lg font-semibold text-ink">{value}</p></div></div>
 }
 
-function KnowledgeList({ title, items, tone }: { title: string; items: ObcpAnalytics['weakPoints']; tone: 'weak' | 'strong' }) {
+function KnowledgeList({
+  title,
+  items,
+  tone,
+  componentMap,
+  onViewArchitectureComponent,
+}: {
+  title: string
+  items: ObcpAnalytics['weakPoints']
+  tone: 'weak' | 'strong'
+  componentMap?: Map<string, string[]>
+  onViewArchitectureComponent?: (componentName: string) => void
+}) {
   return (
     <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-ink">{title}</h3>
@@ -120,10 +139,23 @@ function KnowledgeList({ title, items, tone }: { title: string; items: ObcpAnaly
           <div key={item.name}>
             <div className="flex items-center justify-between text-sm"><span className="font-medium text-slate-700">{item.name}</span><span className={tone === 'weak' ? 'font-semibold text-amber-700' : 'font-semibold text-emerald-700'}>{item.correctRate}%</span></div>
             <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${tone === 'weak' ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${item.correctRate}%` }} /></div>
+            {!!componentMap?.get(item.name)?.length && onViewArchitectureComponent && <ArchitectureComponentTags components={componentMap.get(item.name) ?? []} onSelect={onViewArchitectureComponent} />}
           </div>
         )) : <p className="text-sm text-slate-400">暂无达到诊断样本量的数据。</p>}
       </div>
     </section>
+  )
+}
+
+function ArchitectureComponentTags({ components, onSelect }: { components: string[]; onSelect: (componentName: string) => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {components.map((component) => (
+        <button key={component} type="button" onClick={() => onSelect(component)} className="rounded-md border border-ocean-200 bg-ocean-50 px-2 py-1 text-xs font-semibold text-ocean-700 transition hover:border-ocean-400 hover:bg-ocean-100">
+          {component}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -22,7 +22,11 @@ type ActivePractice = {
   sourceLabel: string
 }
 
-export function QuestionBankPage() {
+type Props = {
+  onViewArchitectureComponent: (componentName: string) => void
+}
+
+export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
   const [userState, setUserState] = useState(() => loadObcpUserState(CURRENT_USER_ID))
   const [activePractice, setActivePractice] = useState<ActivePractice | null>(null)
   const [diagnosisOpen, setDiagnosisOpen] = useState(false)
@@ -76,9 +80,10 @@ export function QuestionBankPage() {
             if (wrongQuestions.length) setActivePractice({ mode: 'wrongBook', questions: wrongQuestions, sourceLabel: '本次练习错题' })
           }}
           onViewDiagnosis={() => setDiagnosisOpen(true)}
+          onViewArchitectureComponent={onViewArchitectureComponent}
           onClose={() => setActivePractice(null)}
         />
-        {diagnosisOpen && <LearningDiagnosisReport analytics={analytics} onClose={() => setDiagnosisOpen(false)} />}
+        {diagnosisOpen && <LearningDiagnosisReport analytics={analytics} onClose={() => setDiagnosisOpen(false)} onViewArchitectureComponent={onViewArchitectureComponent} />}
       </div>
     )
   }
@@ -90,6 +95,7 @@ export function QuestionBankPage() {
       wrongBookCount={userState.wrongBookQuestionIds.length}
       favoriteCount={userState.favoriteQuestionIds.length}
       onStartPractice={startPractice}
+      onViewArchitectureComponent={onViewArchitectureComponent}
     />
   )
 }

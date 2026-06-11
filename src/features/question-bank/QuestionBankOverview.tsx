@@ -24,6 +24,7 @@ type Props = {
   wrongBookCount: number
   favoriteCount: number
   onStartPractice: (mode: ObcpPracticeMode, chapter?: string, questionIds?: string[]) => boolean
+  onViewArchitectureComponent: (componentName: string) => void
 }
 
 const modeConfig = [
@@ -32,7 +33,7 @@ const modeConfig = [
   { id: 'exam' as const, name: '模拟考试', description: '按考试题量完成整组练习', icon: FileClock },
 ]
 
-export function QuestionBankOverview({ analytics, questions, wrongBookCount, favoriteCount, onStartPractice }: Props) {
+export function QuestionBankOverview({ analytics, questions, wrongBookCount, favoriteCount, onStartPractice, onViewArchitectureComponent }: Props) {
   const [reportOpen, setReportOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [favoriteMessage, setFavoriteMessage] = useState('')
@@ -210,7 +211,7 @@ export function QuestionBankOverview({ analytics, questions, wrongBookCount, fav
           ))}
         </div>
       </section>
-      {reportOpen && <LearningDiagnosisReport analytics={analytics} onClose={() => setReportOpen(false)} />}
+      {reportOpen && <LearningDiagnosisReport analytics={analytics} onClose={() => setReportOpen(false)} onViewArchitectureComponent={onViewArchitectureComponent} />}
     </div>
   )
 }

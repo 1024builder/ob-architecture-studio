@@ -31,6 +31,7 @@ type Props = {
   onToggleNotUnderstood: (questionId: string) => void
   onRetryWrong: (questionIds: string[]) => void
   onViewDiagnosis: () => void
+  onViewArchitectureComponent: (componentName: string) => void
   onClose: () => void
 }
 
@@ -45,6 +46,7 @@ export function QuestionPractice({
   onToggleNotUnderstood,
   onRetryWrong,
   onViewDiagnosis,
+  onViewArchitectureComponent,
   onClose,
 }: Props) {
   const [index, setIndex] = useState(0)
@@ -160,6 +162,7 @@ export function QuestionPractice({
         onClose={onClose}
         onRetryWrong={onRetryWrong}
         onViewDiagnosis={onViewDiagnosis}
+        onViewArchitectureComponent={onViewArchitectureComponent}
         onReviewQuestion={(questionIndex) => {
           goToQuestion(questionIndex)
           setPracticeCompleted(false)
@@ -177,6 +180,7 @@ export function QuestionPractice({
         title={title}
         sourceLabel={sourceLabel}
         onClose={onClose}
+        onViewArchitectureComponent={onViewArchitectureComponent}
       />
     )
   }
@@ -266,7 +270,7 @@ export function QuestionPractice({
             </div>
 
             {submitted && !isExam && (
-              <AnswerFeedback question={question} selected={selected} isCorrect={currentState.isCorrect === true} />
+              <AnswerFeedback question={question} selected={selected} isCorrect={currentState.isCorrect === true} onViewArchitectureComponent={onViewArchitectureComponent} />
             )}
 
             <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
@@ -337,6 +341,7 @@ function PracticeSummary({
   onRetryWrong,
   onViewDiagnosis,
   onReviewQuestion,
+  onViewArchitectureComponent,
 }: {
   questions: ObcpQuestion[]
   states: Record<string, ObcpPracticeQuestionState>
@@ -345,6 +350,7 @@ function PracticeSummary({
   onRetryWrong: (questionIds: string[]) => void
   onViewDiagnosis: () => void
   onReviewQuestion: (questionIndex: number) => void
+  onViewArchitectureComponent: (componentName: string) => void
 }) {
   const submittedStates = questions.map((question) => ({ question, state: states[question.questionId] })).filter(({ state }) => state.submitted)
   const correctCount = submittedStates.filter(({ state }) => state.isCorrect).length
@@ -385,7 +391,7 @@ function PracticeSummary({
         <button type="button" onClick={onViewDiagnosis} className="flex h-10 items-center gap-2 rounded-md border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:border-ocean-300 hover:text-ocean-700"><FileSearch size={16} />查看学习诊断</button>
       </div>
       <NextStepSuggestions suggestions={suggestions} />
-      <WrongReviewList items={wrongItems} onReview={onReviewQuestion} />
+      <WrongReviewList items={wrongItems} onReview={onReviewQuestion} onViewArchitectureComponent={onViewArchitectureComponent} />
     </section>
   )
 }
@@ -401,6 +407,7 @@ function ExamResults({
   title,
   sourceLabel,
   onClose,
+  onViewArchitectureComponent,
 }: {
   questions: ObcpQuestion[]
   records: ObcpAnswerRecord[]
@@ -408,6 +415,7 @@ function ExamResults({
   title: string
   sourceLabel: string
   onClose: () => void
+  onViewArchitectureComponent: (componentName: string) => void
 }) {
   const [reviewIndex, setReviewIndex] = useState(0)
   const recordByQuestion = new Map(records.map((record) => [record.questionId, record]))
@@ -461,12 +469,12 @@ function ExamResults({
             <div className="mx-auto mt-5 max-w-4xl">
               <p className="text-xs font-semibold text-slate-400">第 {reviewIndex + 1} 题 · {question.chapter}</p>
               <h3 className="mt-2 text-lg font-semibold leading-8 text-ink">{question.stem}</h3>
-              <AnswerFeedback question={question} selected={record.selectedAnswer} isCorrect={record.isCorrect} />
+              <AnswerFeedback question={question} selected={record.selectedAnswer} isCorrect={record.isCorrect} onViewArchitectureComponent={onViewArchitectureComponent} />
             </div>
           )}
           <div className="mx-auto max-w-4xl">
             <NextStepSuggestions suggestions={suggestions} />
-            <WrongReviewList items={wrongItems} onReview={setReviewIndex} />
+            <WrongReviewList items={wrongItems} onReview={setReviewIndex} onViewArchitectureComponent={onViewArchitectureComponent} />
           </div>
         </div>
       </div>
@@ -480,7 +488,15 @@ type WrongReviewItem = {
   selectedAnswer: string[]
 }
 
-function WrongReviewList({ items, onReview }: { items: WrongReviewItem[]; onReview: (questionIndex: number) => void }) {
+function WrongReviewList({
+  items,
+  onReview,
+  onViewArchitectureComponent,
+}: {
+  items: WrongReviewItem[]
+  onReview: (questionIndex: number) => void
+  onViewArchitectureComponent: (componentName: string) => void
+}) {
   return (
     <section className="mt-6 border-t border-slate-200 pt-5">
       <div className="flex items-center justify-between gap-3">
@@ -511,6 +527,12 @@ function WrongReviewList({ items, onReview }: { items: WrongReviewItem[]; onRevi
                 <p><span className="font-semibold text-slate-700">知识点：</span>{question.knowledgePoints.join('、')}</p>
                 <p><span className="font-semibold text-slate-700">常见误区：</span>{question.commonMistakes.join('；') || '暂无'}</p>
                 <p><span className="font-semibold text-slate-700">复习建议：</span>{question.reviewSuggestion}</p>
+                {!!question.relatedComponents.length && (
+                  <div className="pt-1">
+                    <p className="font-semibold text-slate-700">关联架构组件</p>
+                    <ArchitectureComponentTags components={question.relatedComponents} onSelect={onViewArchitectureComponent} />
+                  </div>
+                )}
               </div>
             </article>
           ))}
@@ -561,7 +583,17 @@ function truncateText(value: string, length: number) {
   return value.length > length ? `${value.slice(0, length)}...` : value
 }
 
-function AnswerFeedback({ question, selected, isCorrect }: { question: ObcpQuestion; selected: string[]; isCorrect: boolean }) {
+function AnswerFeedback({
+  question,
+  selected,
+  isCorrect,
+  onViewArchitectureComponent,
+}: {
+  question: ObcpQuestion
+  selected: string[]
+  isCorrect: boolean
+  onViewArchitectureComponent: (componentName: string) => void
+}) {
   return (
     <div className={`mt-5 rounded-md border p-4 ${isCorrect ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'}`}>
       <div className={`flex items-center gap-2 text-sm font-semibold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -577,8 +609,25 @@ function AnswerFeedback({ question, selected, isCorrect }: { question: ObcpQuest
         <p className="mt-2"><span className="font-semibold">涉及知识点：</span>{question.knowledgePoints.join('、')}</p>
         <p className="mt-2"><span className="font-semibold">建议复习：</span>{question.reviewSuggestion}</p>
         {!!question.commonMistakes.length && <p className="mt-2"><span className="font-semibold">常见误区：</span>{question.commonMistakes.join('；')}</p>}
-        {!!question.relatedComponents.length && <p className="mt-2 text-ocean-700"><span className="font-semibold">建议回看架构图：</span>{question.relatedComponents.join('、')}</p>}
+        {!!question.relatedComponents.length && (
+          <div className="mt-3 rounded-md border border-ocean-100 bg-white/70 p-3">
+            <p className="text-xs font-semibold text-ocean-800">建议回看架构组件</p>
+            <ArchitectureComponentTags components={question.relatedComponents} onSelect={onViewArchitectureComponent} />
+          </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+function ArchitectureComponentTags({ components, onSelect }: { components: string[]; onSelect: (componentName: string) => void }) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {components.map((component) => (
+        <button key={component} type="button" onClick={() => onSelect(component)} className="rounded-md border border-ocean-200 bg-ocean-50 px-2 py-1 text-xs font-semibold text-ocean-700 transition hover:border-ocean-400 hover:bg-ocean-100">
+          {component}
+        </button>
+      ))}
     </div>
   )
 }
