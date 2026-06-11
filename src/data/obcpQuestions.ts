@@ -1,11 +1,12 @@
 import type { ObcpQuestion } from './obcpTypes'
+import { obcpQuestionAdditions } from './obcpQuestionAdditions'
 
 const trueFalseOptions = [
   { id: 'true', label: 'A', text: '正确' },
   { id: 'false', label: 'B', text: '错误' },
 ]
 
-export const obcpQuestions: ObcpQuestion[] = [
+const coreObcpQuestions: ObcpQuestion[] = [
   {
     questionId: 'OBCP-ARCH-001',
     type: 'single',
@@ -239,6 +240,11 @@ export const obcpQuestions: ObcpQuestion[] = [
     reviewSuggestion: '复习日志归档状态、同步延迟、RPO 与主备切换前检查。',
     examPoint: '归档延迟对 RPO 和可恢复时间点的影响。',
   },
+]
+
+export const obcpQuestions: ObcpQuestion[] = [
+  ...coreObcpQuestions,
+  ...obcpQuestionAdditions,
 ]
 
 export const obcpChapters = Array.from(new Set(obcpQuestions.map((question) => question.chapter)))

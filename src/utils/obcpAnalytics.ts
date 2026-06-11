@@ -14,8 +14,9 @@ export function calculateObcpAnalytics(
   userState: ObcpUserState,
   questions: ObcpQuestion[],
 ): ObcpAnalytics {
-  const records = userState.records
   const questionById = new Map(questions.map((question) => [question.questionId, question]))
+  const records = userState.records.filter((record) => questionById.has(record.questionId))
+  const availableQuestionIds = new Set(questionById.keys())
   const latestRecord = [...records].sort((a, b) => b.answeredAt.localeCompare(a.answeredAt))[0]
   const totalCorrect = records.filter((record) => record.isCorrect).length
   const uniqueAnswered = new Set(records.map((record) => record.questionId)).size
@@ -51,8 +52,8 @@ export function calculateObcpAnalytics(
       totalAnswered: records.length,
       uniqueAnswered,
       correctRate: percentage(totalCorrect, records.length),
-      wrongCount: userState.wrongBookQuestionIds.length,
-      favoriteCount: userState.favoriteQuestionIds.length,
+      wrongCount: userState.wrongBookQuestionIds.filter((id) => availableQuestionIds.has(id)).length,
+      favoriteCount: userState.favoriteQuestionIds.filter((id) => availableQuestionIds.has(id)).length,
       averageDurationSeconds: average(records.map((record) => record.durationSeconds)),
       recentPractice: latestRecord ? questionById.get(latestRecord.questionId)?.chapter : undefined,
       recentPracticeAt: latestRecord?.answeredAt,

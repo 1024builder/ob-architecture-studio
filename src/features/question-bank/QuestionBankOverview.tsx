@@ -3,7 +3,9 @@ import {
   BookMarked,
   CheckCircle2,
   Clock3,
+  Database,
   Dices,
+  Download,
   FileClock,
   ListChecks,
   RotateCcw,
@@ -11,12 +13,14 @@ import {
   SearchX,
   Target,
   TrendingUp,
+  Upload,
   X,
 } from 'lucide-react'
 import { LearningDiagnosisExport } from '../../components/obcp/LearningDiagnosisExport'
 import { LearningDiagnosisReport } from '../../components/obcp/LearningDiagnosisReport'
 import type { ObcpAnalytics, ObcpPracticeMode, ObcpQuestion } from '../../data/obcpTypes'
 import { useState } from 'react'
+import { downloadQuestionBank } from '../../utils/obcpQuestionImportExport'
 
 type Props = {
   analytics: ObcpAnalytics
@@ -25,6 +29,8 @@ type Props = {
   favoriteCount: number
   onStartPractice: (mode: ObcpPracticeMode, chapter?: string, questionIds?: string[]) => boolean
   onViewArchitectureComponent: (componentName: string) => void
+  onOpenQuestionBankManager: () => void
+  onImportQuestionBank: () => void
 }
 
 const modeConfig = [
@@ -33,7 +39,16 @@ const modeConfig = [
   { id: 'exam' as const, name: '模拟考试', description: '按考试题量完成整组练习', icon: FileClock },
 ]
 
-export function QuestionBankOverview({ analytics, questions, wrongBookCount, favoriteCount, onStartPractice, onViewArchitectureComponent }: Props) {
+export function QuestionBankOverview({
+  analytics,
+  questions,
+  wrongBookCount,
+  favoriteCount,
+  onStartPractice,
+  onViewArchitectureComponent,
+  onOpenQuestionBankManager,
+  onImportQuestionBank,
+}: Props) {
   const [reportOpen, setReportOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [favoriteMessage, setFavoriteMessage] = useState('')
@@ -78,6 +93,17 @@ export function QuestionBankOverview({ analytics, questions, wrongBookCount, fav
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">围绕 OceanBase 认证知识体系进行章节练习、错题复习与模拟考试。</p>
         </div>
         <div className="flex flex-col gap-3 xl:items-end">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onOpenQuestionBankManager} className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-ocean-300 hover:text-ocean-700">
+              <Database size={16} />题库管理
+            </button>
+            <button type="button" onClick={onImportQuestionBank} className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-ocean-300 hover:text-ocean-700">
+              <Upload size={16} />导入题库
+            </button>
+            <button type="button" onClick={() => downloadQuestionBank(questions)} className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:border-ocean-300 hover:text-ocean-700">
+              <Download size={16} />导出题库
+            </button>
+          </div>
           <LearningDiagnosisExport analytics={analytics} onView={() => setReportOpen(true)} />
           <div className="flex h-10 w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 shadow-sm focus-within:border-ocean-400 focus-within:ring-2 focus-within:ring-ocean-100 xl:w-80">
             <Search size={17} className="shrink-0 text-slate-400" />

@@ -1,10 +1,17 @@
 import { useMemo, useState } from 'react'
+import { QuestionBankManager } from '../components/obcp/QuestionBankManager'
 import { QuestionPractice } from '../components/obcp/QuestionPractice'
 import { LearningDiagnosisReport } from '../components/obcp/LearningDiagnosisReport'
 import { obcpQuestions } from '../data/obcpQuestions'
 import type { ObcpAnswerRecord, ObcpPracticeMode, ObcpQuestion } from '../data/obcpTypes'
 import { QuestionBankOverview } from '../features/question-bank/QuestionBankOverview'
 import { calculateObcpAnalytics } from '../utils/obcpAnalytics'
+import {
+  clearCustomObcpQuestions,
+  loadCustomObcpQuestions,
+  mergeObcpQuestions,
+  saveCustomObcpQuestions,
+} from '../utils/obcpQuestionImportExport'
 import {
   appendAnswerRecords,
   loadObcpUserState,
@@ -28,9 +35,18 @@ type Props = {
 
 export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
   const [userState, setUserState] = useState(() => loadObcpUserState(CURRENT_USER_ID))
+  const [customQuestions, setCustomQuestions] = useState(loadCustomObcpQuestions)
   const [activePractice, setActivePractice] = useState<ActivePractice | null>(null)
   const [diagnosisOpen, setDiagnosisOpen] = useState(false)
-  const analytics = useMemo(() => calculateObcpAnalytics(userState, obcpQuestions), [userState])
+  const [managerMode, setManagerMode] = useState<'manage' | 'import' | null>(null)
+  const allQuestions = useMemo(
+    () => mergeObcpQuestions(obcpQuestions, customQuestions),
+    [customQuestions],
+  )
+  const analytics = useMemo(
+    () => calculateObcpAnalytics(userState, allQuestions),
+    [userState, allQuestions],
+  )
 
   function updateUserState(updater: (current: typeof userState) => typeof userState) {
     setUserState((current) => {
@@ -42,14 +58,14 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
 
   function startPractice(mode: ObcpPracticeMode, chapter?: string, questionIds?: string[]) {
     const allowedQuestionIds = questionIds ? new Set(questionIds) : null
-    let questions = obcpQuestions.filter((question) =>
+    let questions = allQuestions.filter((question) =>
       (!chapter || question.chapter === chapter)
       && (!allowedQuestionIds || allowedQuestionIds.has(question.questionId)),
     )
     if (mode === 'random') questions = shuffle(questions).slice(0, Math.min(10, questions.length))
     if (mode === 'exam') questions = shuffle(questions).slice(0, Math.min(12, questions.length))
-    if (mode === 'wrongBook') questions = obcpQuestions.filter((question) => userState.wrongBookQuestionIds.includes(question.questionId))
-    if (mode === 'favorite') questions = obcpQuestions.filter((question) => userState.favoriteQuestionIds.includes(question.questionId))
+    if (mode === 'wrongBook') questions = allQuestions.filter((question) => userState.wrongBookQuestionIds.includes(question.questionId))
+    if (mode === 'favorite') questions = allQuestions.filter((question) => userState.favoriteQuestionIds.includes(question.questionId))
     if (!questions.length) return false
     setActivePractice({
       mode,
@@ -76,7 +92,7 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
           onToggleWrongBook={(questionId) => updateUserState((current) => toggleWrongBook(current, questionId))}
           onToggleNotUnderstood={(questionId) => updateUserState((current) => toggleNotUnderstood(current, questionId))}
           onRetryWrong={(questionIds) => {
-            const wrongQuestions = obcpQuestions.filter((question) => questionIds.includes(question.questionId))
+            const wrongQuestions = allQuestions.filter((question) => questionIds.includes(question.questionId))
             if (wrongQuestions.length) setActivePractice({ mode: 'wrongBook', questions: wrongQuestions, sourceLabel: '本次练习错题' })
           }}
           onViewDiagnosis={() => setDiagnosisOpen(true)}
@@ -89,14 +105,36 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
   }
 
   return (
+    <>
     <QuestionBankOverview
       analytics={analytics}
-      questions={obcpQuestions}
-      wrongBookCount={userState.wrongBookQuestionIds.length}
-      favoriteCount={userState.favoriteQuestionIds.length}
+      questions={allQuestions}
+      wrongBookCount={userState.wrongBookQuestionIds.filter((id) => allQuestions.some((question) => question.questionId === id)).length}
+      favoriteCount={userState.favoriteQuestionIds.filter((id) => allQuestions.some((question) => question.questionId === id)).length}
       onStartPractice={startPractice}
       onViewArchitectureComponent={onViewArchitectureComponent}
+      onOpenQuestionBankManager={() => setManagerMode('manage')}
+      onImportQuestionBank={() => setManagerMode('import')}
     />
+    {managerMode && (
+      <QuestionBankManager
+        builtInQuestions={obcpQuestions}
+        customQuestions={customQuestions}
+        allQuestions={allQuestions}
+        onImport={(questions) => {
+          const next = [...customQuestions, ...questions]
+          saveCustomObcpQuestions(next)
+          setCustomQuestions(next)
+        }}
+        onClearCustom={() => {
+          clearCustomObcpQuestions()
+          setCustomQuestions([])
+        }}
+        autoOpenImport={managerMode === 'import'}
+        onClose={() => setManagerMode(null)}
+      />
+    )}
+    </>
   )
 }
 
