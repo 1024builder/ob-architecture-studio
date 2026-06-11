@@ -16,6 +16,18 @@ type AuthTokenResponse = {
   user: SupabaseUser
 }
 
+type SignUpResponse = {
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  user: SupabaseUser
+}
+
+export type SignUpResult = {
+  session: SupabaseSession | null
+  requiresEmailConfirmation: boolean
+}
+
 export function getStoredSession(): SupabaseSession | null {
   if (!isSupabaseConfigured) return null
   try {
@@ -54,6 +66,48 @@ export async function sendMagicLink(email: string) {
       email_redirect_to: `${window.location.origin}${window.location.pathname}`,
     }),
   })
+}
+
+export async function signInWithPassword(email: string, password: string) {
+  try {
+    const response = await supabaseRequest<AuthTokenResponse>(
+      '/auth/v1/token?grant_type=password',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      },
+    )
+    const session = tokenResponseToSession(response)
+    saveSession(session)
+    return session
+  } catch (error) {
+    throw new Error(getFriendlyAuthError(error, 'login'))
+  }
+}
+
+export async function signUpWithPassword(email: string, password: string): Promise<SignUpResult> {
+  try {
+    const response = await supabaseRequest<SignUpResponse>(
+      '/auth/v1/signup',
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      },
+    )
+    if (response.access_token && response.refresh_token && response.expires_in) {
+      const session = tokenResponseToSession({
+        access_token: response.access_token,
+        refresh_token: response.refresh_token,
+        expires_in: response.expires_in,
+        user: response.user,
+      })
+      saveSession(session)
+      return { session, requiresEmailConfirmation: false }
+    }
+    return { session: null, requiresEmailConfirmation: true }
+  } catch (error) {
+    throw new Error(getFriendlyAuthError(error, 'signup'))
+  }
 }
 
 export async function signOut() {
@@ -130,4 +184,28 @@ function parseJwt(token: string): Record<string, unknown> | null {
   } catch {
     return null
   }
+}
+
+function getFriendlyAuthError(error: unknown, action: 'login' | 'signup') {
+  const rawMessage = error instanceof Error ? error.message : String(error)
+  let message = rawMessage
+  try {
+    const parsed = JSON.parse(rawMessage) as { msg?: string; message?: string; error_description?: string; error_code?: string }
+    message = parsed.msg ?? parsed.message ?? parsed.error_description ?? parsed.error_code ?? rawMessage
+  } catch {
+    // Supabase may return plain text instead of JSON.
+  }
+
+  const normalized = message.toLocaleLowerCase()
+  if (normalized.includes('invalid login credentials')) return '邮箱或密码错误，请检查后重试。'
+  if (normalized.includes('email not confirmed')) return '邮箱尚未确认，请先查收确认邮件。'
+  if (normalized.includes('user not found')) return '用户不存在，请先注册账号。'
+  if (normalized.includes('password') && (normalized.includes('short') || normalized.includes('characters'))) {
+    return '密码长度不足，请至少输入 6 位密码。'
+  }
+  if (normalized.includes('already registered') || normalized.includes('already been registered')) {
+    return '该邮箱已注册，请直接登录。'
+  }
+  if (normalized.includes('rate limit')) return '操作过于频繁，请稍后再试。'
+  return action === 'login' ? '登录失败，请检查邮箱、密码或网络连接。' : '注册失败，请检查填写信息后重试。'
 }
