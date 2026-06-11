@@ -12,7 +12,11 @@ import {
   saveCustomTroubleshootingCases,
 } from '../utils/troubleshootingImportExport'
 
-export function TroubleshootingPage() {
+type Props = {
+  onViewArchitectureComponent: (componentName: string) => void
+}
+
+export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
   const [customCases, setCustomCases] = useState(loadCustomTroubleshootingCases)
   const [managerOpen, setManagerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -96,7 +100,7 @@ export function TroubleshootingPage() {
           <CaseList cases={filteredCases} selectedCaseId={selectedCaseId} onSelect={setSelectedCaseId} />
         </div>
         {selectedCase
-          ? <CaseDetail item={selectedCase} />
+          ? <CaseDetail item={selectedCase} onViewArchitectureComponent={onViewArchitectureComponent} />
           : <div className="hidden min-h-72 place-items-center border border-dashed border-slate-300 bg-white text-sm text-slate-400 xl:grid">调整筛选条件后查看案例详情</div>}
       </section>
       {managerOpen && (

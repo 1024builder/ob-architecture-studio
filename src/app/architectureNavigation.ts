@@ -5,7 +5,13 @@ export type ArchitectureNavigationRequest = {
   requestId: number
 }
 
-const componentTargets: Record<string, { componentId: string; modelId: string }> = {
+type ComponentTarget = {
+  modelId: string
+  componentId?: string
+  nodeId?: string
+}
+
+const componentTargets: Record<string, ComponentTarget> = {
   zone: { componentId: 'zone', modelId: 'replicas' },
   observer: { componentId: 'observer', modelId: 'replicas' },
   rootservice: { componentId: 'rootservice', modelId: 'replicas' },
@@ -15,6 +21,24 @@ const componentTargets: Record<string, { componentId: string; modelId: string }>
   tablet: { componentId: 'tablet', modelId: 'ls-tablet' },
   obproxy: { componentId: 'obproxy', modelId: 'proxy' },
   ocp: { componentId: 'ocp', modelId: 'ocp' },
+  agent: { modelId: 'ocp', nodeId: 'agent-a' },
+  monitoringagent: { modelId: 'ocp', nodeId: 'agent-a' },
+  monitoringplatform: { modelId: 'ocp', nodeId: 'ocp' },
+  archivelog: { modelId: 'standby', nodeId: 'archive' },
+  influxdb: { modelId: 'replicas' },
+  mysql: { modelId: 'replicas' },
+  mysqlprimary: { modelId: 'replicas' },
+  mysqlreplica: { modelId: 'replicas' },
+  redis: { modelId: 'replicas' },
+  postgresql: { modelId: 'replicas' },
+  oracle: { modelId: 'standby' },
+  oraclerac: { modelId: 'standby' },
+  sqlserver: { modelId: 'replicas' },
+  binlog: { modelId: 'standby' },
+  fra: { modelId: 'standby' },
+  asm: { modelId: 'standby' },
+  linux: { modelId: 'ocp' },
+  database: { modelId: 'replicas' },
 }
 
 export function resolveArchitectureTarget(componentName: string) {
@@ -26,8 +50,11 @@ export function resolveArchitectureTarget(componentName: string) {
   const configuredTarget = componentTargets[normalized]
   if (configuredTarget) {
     const model = architectureModels.find((item) => item.id === configuredTarget.modelId)
-    const node = model?.nodes.find((item) => item.componentId === configuredTarget.componentId)
+    const node = configuredTarget.nodeId
+      ? model?.nodes.find((item) => item.id === configuredTarget.nodeId)
+      : model?.nodes.find((item) => item.componentId === configuredTarget.componentId)
     if (model && node) return { modelId: model.id, nodeId: node.id }
+    if (model) return { modelId: model.id }
   }
 
   for (const model of architectureModels) {

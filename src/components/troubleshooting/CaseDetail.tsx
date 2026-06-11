@@ -18,9 +18,10 @@ import {
 
 type Props = {
   item: TroubleshootingCase
+  onViewArchitectureComponent: (componentName: string) => void
 }
 
-export function CaseDetail({ item }: Props) {
+export function CaseDetail({ item, onViewArchitectureComponent }: Props) {
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle')
 
@@ -110,7 +111,17 @@ export function CaseDetail({ item }: Props) {
         <section className="border-t border-slate-200 pt-5">
           <h3 className="text-sm font-semibold text-ink">相关组件与知识点</h3>
           <div className="mt-3 flex flex-wrap gap-2">
-            {item.relatedComponents.map((component) => <span key={component} className="rounded bg-ocean-50 px-2 py-1 text-xs font-semibold text-ocean-700">{component}</span>)}
+            {item.relatedComponents.map((component) => (
+              <button
+                key={component}
+                type="button"
+                title={`在架构分析中查看 ${component}`}
+                onClick={() => onViewArchitectureComponent(component)}
+                className="rounded bg-ocean-50 px-2 py-1 text-xs font-semibold text-ocean-700 transition hover:bg-ocean-100 hover:text-ocean-900 focus:outline-none focus:ring-2 focus:ring-ocean-300"
+              >
+                {component}
+              </button>
+            ))}
             {item.relatedKnowledgePoints.map((point) => <span key={point} className="rounded bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">{point}</span>)}
           </div>
         </section>

@@ -3,6 +3,7 @@ import type { ArchitectureNavigationRequest } from './app/architectureNavigation
 import { AppShell } from './app/AppShell'
 import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
 import { ArchitecturePage } from './pages/ArchitecturePage'
+import { DashboardPage } from './pages/DashboardPage'
 import { QuestionBankPage } from './pages/QuestionBankPage'
 import { TroubleshootingPage } from './pages/TroubleshootingPage'
 
@@ -17,7 +18,7 @@ function App() {
   }, [])
 
   function handleModuleChange(moduleId: AppModuleId) {
-    window.location.hash = appModules.find((module) => module.id === moduleId)?.path ?? '#/architecture'
+    window.location.hash = appModules.find((module) => module.id === moduleId)?.path ?? '#/dashboard'
     setActiveModule(moduleId)
   }
 
@@ -32,7 +33,9 @@ function App() {
 
   return (
     <AppShell activeModule={activeModule} onModuleChange={handleModuleChange}>
-      {activeModule === 'architecture' ? (
+      {activeModule === 'dashboard' ? (
+          <DashboardPage onModuleChange={handleModuleChange} />
+        ) : activeModule === 'architecture' ? (
           <ArchitecturePage
             navigationRequest={architectureRequest}
             onNavigationHandled={handleArchitectureNavigationHandled}
@@ -40,7 +43,7 @@ function App() {
         ) : activeModule === 'question-bank' ? (
           <QuestionBankPage onViewArchitectureComponent={handleArchitectureComponent} />
         ) : (
-          <TroubleshootingPage />
+          <TroubleshootingPage onViewArchitectureComponent={handleArchitectureComponent} />
         )}
     </AppShell>
   )

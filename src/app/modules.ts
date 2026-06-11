@@ -1,7 +1,7 @@
-import { BookOpenCheck, Network, Siren } from 'lucide-react'
+import { BookOpenCheck, House, Network, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type AppModuleId = 'architecture' | 'question-bank' | 'troubleshooting'
+export type AppModuleId = 'dashboard' | 'architecture' | 'question-bank' | 'troubleshooting'
 
 export type AppModule = {
   id: AppModuleId
@@ -13,6 +13,14 @@ export type AppModule = {
 }
 
 export const appModules: AppModule[] = [
+  {
+    id: 'dashboard',
+    name: '首页总览',
+    shortName: '首页',
+    description: 'OceanBase 学习与 DBA 运维工作台总览',
+    path: '#/dashboard',
+    icon: House,
+  },
   {
     id: 'architecture',
     name: '架构原理分析',
@@ -40,7 +48,8 @@ export const appModules: AppModule[] = [
 ]
 
 export function getModuleFromHash(hash: string): AppModuleId {
+  if (hash.includes('architecture')) return 'architecture'
   if (hash.includes('troubleshooting')) return 'troubleshooting'
   if (hash.includes('question-bank')) return 'question-bank'
-  return 'architecture'
+  return 'dashboard'
 }

@@ -39,8 +39,16 @@ export function ArchitecturePage({ navigationRequest, onNavigationHandled }: Pro
     const target = resolveArchitectureTarget(navigationRequest.componentName)
     if (target) {
       setActiveModelId(target.modelId)
-      setSelectedNodeId(target.nodeId)
-      setNavigationNotice(`已定位到 ${navigationRequest.componentName} 组件`)
+      if (target.nodeId) {
+        setSelectedNodeId(target.nodeId)
+        setNavigationNotice(`已定位到 ${navigationRequest.componentName} 组件`)
+      } else {
+        const targetModel = architectureModels.find((model) => model.id === target.modelId)
+        const defaultNode = targetModel?.nodes.find((node) => node.componentId === targetModel.defaultComponentId)
+          ?? targetModel?.nodes[0]
+        if (defaultNode) setSelectedNodeId(defaultNode.id)
+        setNavigationNotice(`建议查看 ${navigationRequest.componentName} 组件`)
+      }
     } else {
       setNavigationNotice(`建议查看 ${navigationRequest.componentName} 组件`)
     }
