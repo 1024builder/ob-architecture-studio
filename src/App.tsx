@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ArchitectureNavigationRequest } from './app/architectureNavigation'
 import { AppShell } from './app/AppShell'
 import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
@@ -25,10 +25,19 @@ function App() {
     handleModuleChange('architecture')
   }
 
+  const handleArchitectureNavigationHandled = useCallback(() => {
+    setArchitectureRequest(null)
+  }, [])
+
   return (
     <AppShell activeModule={activeModule} onModuleChange={handleModuleChange}>
       {activeModule === 'architecture'
-        ? <ArchitecturePage navigationRequest={architectureRequest} onNavigationHandled={() => setArchitectureRequest(null)} />
+        ? (
+          <ArchitecturePage
+            navigationRequest={architectureRequest}
+            onNavigationHandled={handleArchitectureNavigationHandled}
+          />
+        )
         : <QuestionBankPage onViewArchitectureComponent={handleArchitectureComponent} />}
     </AppShell>
   )

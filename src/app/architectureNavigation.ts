@@ -19,6 +19,10 @@ const componentTargets: Record<string, { componentId: string; modelId: string }>
 
 export function resolveArchitectureTarget(componentName: string) {
   const normalized = componentName.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
+  if (!normalized) {
+    return null
+  }
+
   const configuredTarget = componentTargets[normalized]
   if (configuredTarget) {
     const model = architectureModels.find((item) => item.id === configuredTarget.modelId)
@@ -27,11 +31,12 @@ export function resolveArchitectureTarget(componentName: string) {
   }
 
   for (const model of architectureModels) {
-    const node = model.nodes.find((item) =>
-      item.componentId.toLocaleLowerCase() === normalized
-      || item.kind.toLocaleLowerCase() === normalized
-      || item.label.toLocaleLowerCase().replace(/[^a-z0-9]/g, '').includes(normalized),
-    )
+    const node = model.nodes.find((item) => {
+      const normalizedLabel = item.label.toLocaleLowerCase().replace(/[^a-z0-9]/g, '')
+      return item.componentId.toLocaleLowerCase() === normalized
+        || item.kind.toLocaleLowerCase() === normalized
+        || (normalized.length >= 2 && normalizedLabel.includes(normalized))
+    })
     if (node) return { modelId: model.id, nodeId: node.id }
   }
   return null
