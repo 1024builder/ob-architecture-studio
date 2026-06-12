@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { QuestionNavigationRequest } from '../app/contentNavigation'
 import { QuestionBankManager } from '../components/obcp/QuestionBankManager'
 import { QuestionPractice } from '../components/obcp/QuestionPractice'
 import { LearningDiagnosisReport } from '../components/obcp/LearningDiagnosisReport'
@@ -34,14 +35,21 @@ type ActivePractice = {
 
 type Props = {
   onViewArchitectureComponent: (componentName: string) => void
+  navigationRequest?: QuestionNavigationRequest | null
+  onNavigationHandled?: () => void
 }
 
-export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
+export function QuestionBankPage({
+  onViewArchitectureComponent,
+  navigationRequest,
+  onNavigationHandled,
+}: Props) {
   const [userState, setUserState] = useState(() => loadObcpUserState(CURRENT_USER_ID))
   const [customQuestions, setCustomQuestions] = useState(loadCustomObcpQuestions)
   const [activePractice, setActivePractice] = useState<ActivePractice | null>(null)
   const [diagnosisOpen, setDiagnosisOpen] = useState(false)
   const [managerMode, setManagerMode] = useState<'manage' | 'import' | null>(null)
+  const [navigationNotice, setNavigationNotice] = useState('')
   const allQuestions = useMemo(
     () => mergeObcpQuestions(obcpQuestions, customQuestions),
     [customQuestions],
@@ -61,6 +69,27 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
       window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, reloadCustomQuestions)
     }
   }, [])
+
+  useEffect(() => {
+    if (!navigationRequest) return
+    const question = allQuestions.find((item) =>
+      item.questionId === navigationRequest.questionId,
+    )
+    if (question) {
+      const isCustomQuestion = customQuestions.some((item) =>
+        item.questionId === question.questionId,
+      )
+      setActivePractice({
+        mode: 'sequential',
+        questions: [question],
+        sourceLabel: `全局搜索 · ${isCustomQuestion ? '自定义题目' : '内置题目'}`,
+      })
+      setNavigationNotice('')
+    } else {
+      setNavigationNotice(`未找到题目 ${navigationRequest.questionId}，可能已被删除或尚未同步。`)
+    }
+    onNavigationHandled?.()
+  }, [allQuestions, customQuestions, navigationRequest, onNavigationHandled])
 
   function updateUserState(updater: (current: typeof userState) => typeof userState) {
     setUserState((current) => {
@@ -121,6 +150,12 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
 
   return (
     <>
+    {navigationNotice && (
+      <div className="mx-3 mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 sm:mx-4 lg:mx-5">
+        <span>{navigationNotice}</span>
+        <button type="button" onClick={() => setNavigationNotice('')} className="text-xs font-semibold">关闭</button>
+      </div>
+    )}
     <QuestionBankOverview
       analytics={analytics}
       questions={allQuestions}

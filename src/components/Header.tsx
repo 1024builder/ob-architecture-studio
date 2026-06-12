@@ -1,4 +1,4 @@
-import { Cpu } from 'lucide-react'
+import { Cpu, Search } from 'lucide-react'
 import { appModules, type AppModuleId } from '../app/modules'
 import { UserSyncStatus } from './auth/UserSyncStatus'
 
@@ -22,7 +22,7 @@ export function Header({ activeModule, onModuleChange }: Props) {
         </div>
 
         <nav className="ml-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto sm:ml-4">
-          {appModules.map((module) => {
+          {appModules.filter((module) => module.id !== 'search').map((module) => {
             const Icon = module.icon
             const isActive = activeModule === module.id
             return (
@@ -41,6 +41,19 @@ export function Header({ activeModule, onModuleChange }: Props) {
           })}
         </nav>
 
+        <button
+          type="button"
+          title="全局搜索"
+          onClick={() => onModuleChange('search')}
+          className={`flex h-9 shrink-0 items-center gap-2 rounded-md border px-2.5 text-xs font-semibold transition sm:px-3 ${
+            activeModule === 'search'
+              ? 'border-ocean-200 bg-ocean-50 text-ocean-700'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-ocean-300 hover:text-ocean-700'
+          }`}
+        >
+          <Search size={15} />
+          <span className="hidden xl:inline">全局搜索</span>
+        </button>
         <UserSyncStatus />
       </div>
     </header>

@@ -36,21 +36,33 @@ export function ArchitecturePage({ navigationRequest, onNavigationHandled }: Pro
 
   useEffect(() => {
     if (!navigationRequest) return
-    const target = resolveArchitectureTarget(navigationRequest.componentName)
+    const directModel = navigationRequest.modelId
+      ? architectureModels.find((model) => model.id === navigationRequest.modelId)
+      : undefined
+    const directNode = directModel && navigationRequest.nodeId
+      ? directModel.nodes.find((node) => node.id === navigationRequest.nodeId)
+      : undefined
+    const target = directModel
+      ? { modelId: directModel.id, nodeId: directNode?.id }
+      : resolveArchitectureTarget(navigationRequest.componentName ?? '')
+    const targetName = navigationRequest.componentName
+      ?? directNode?.label
+      ?? directModel?.name
+      ?? '相关架构'
     if (target) {
       setActiveModelId(target.modelId)
       if (target.nodeId) {
         setSelectedNodeId(target.nodeId)
-        setNavigationNotice(`已定位到 ${navigationRequest.componentName} 组件`)
+        setNavigationNotice(`已定位到 ${targetName}`)
       } else {
         const targetModel = architectureModels.find((model) => model.id === target.modelId)
         const defaultNode = targetModel?.nodes.find((node) => node.componentId === targetModel.defaultComponentId)
           ?? targetModel?.nodes[0]
         if (defaultNode) setSelectedNodeId(defaultNode.id)
-        setNavigationNotice(`建议查看 ${navigationRequest.componentName} 组件`)
+        setNavigationNotice(`建议查看 ${targetName}`)
       }
     } else {
-      setNavigationNotice(`建议查看 ${navigationRequest.componentName} 组件`)
+      setNavigationNotice(`建议查看 ${targetName}`)
     }
     onNavigationHandled?.()
   }, [navigationRequest, onNavigationHandled])

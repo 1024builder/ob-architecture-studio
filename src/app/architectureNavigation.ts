@@ -1,7 +1,9 @@
 import { architectureModels } from '../data/models'
 
 export type ArchitectureNavigationRequest = {
-  componentName: string
+  componentName?: string
+  modelId?: string
+  nodeId?: string
   requestId: number
 }
 

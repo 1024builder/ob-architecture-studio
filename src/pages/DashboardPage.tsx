@@ -11,6 +11,7 @@ import {
   GitBranch,
   Lightbulb,
   Network,
+  Search,
   Siren,
   Target,
   TrendingUp,
@@ -38,6 +39,9 @@ import {
   TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
 } from '../utils/troubleshootingImportExport'
 import {
+  loadRecentGlobalSearches,
+} from '../services/globalSearchService'
+import {
   getObcpSyncStatus,
   OBCP_SYNC_STATUS_CHANGED_EVENT,
   type ObcpSyncStatusSnapshot,
@@ -52,15 +56,17 @@ const CURRENT_USER_ID = 'local-user'
 
 type Props = {
   onModuleChange: (moduleId: AppModuleId) => void
+  onGlobalSearch: (query?: string) => void
 }
 
-export function DashboardPage({ onModuleChange }: Props) {
+export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
   const [dataRevision, setDataRevision] = useState(0)
   const [syncStatus, setSyncStatus] = useState(getObcpSyncStatus)
   const [customQuestionSyncStatus, setCustomQuestionSyncStatus] =
     useState(getCustomQuestionSyncStatus)
   const [caseSyncStatus, setCaseSyncStatus] =
     useState(getTroubleshootingCaseSyncStatus)
+  const [knowledgeQuery, setKnowledgeQuery] = useState('')
   useEffect(() => {
     const refreshDashboard = () => setDataRevision((value) => value + 1)
     const refreshSyncStatus = (event: Event) => {
@@ -150,6 +156,54 @@ export function DashboardPage({ onModuleChange }: Props) {
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
           OceanBase 架构学习、OBCP 刷题训练与 DBA 故障案例沉淀工作台
         </p>
+      </section>
+
+      <section>
+        <SectionHeading eyebrow="Knowledge Workspace" title="知识工作台" />
+        <div className="mt-3 grid gap-4 border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.65fr)] sm:p-5">
+          <div>
+            <form
+              className="flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                onGlobalSearch(knowledgeQuery)
+              }}
+            >
+              <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-md border border-slate-200 px-3 focus-within:border-ocean-400 focus-within:ring-2 focus-within:ring-ocean-100">
+                <Search size={17} className="shrink-0 text-slate-400" />
+                <input
+                  value={knowledgeQuery}
+                  onChange={(event) => setKnowledgeQuery(event.target.value)}
+                  placeholder="搜索题库 / 案例 / 架构 / SQL / 命令"
+                  aria-label="Dashboard 全局搜索"
+                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                />
+              </label>
+              <button type="submit" className="h-11 shrink-0 rounded-md bg-ocean-600 px-4 text-sm font-semibold text-white hover:bg-ocean-700">搜索</button>
+            </form>
+            <DashboardSearchTerms
+              title="推荐搜索"
+              items={['OBProxy', 'LS', 'Tablet', '主从复制', 'InfluxDB', 'RLS', '租户资源隔离', 'SQL 审计']}
+              onSelect={onGlobalSearch}
+            />
+            <DashboardSearchTerms
+              title="最近搜索"
+              items={loadRecentGlobalSearches()}
+              emptyText="暂无搜索记录"
+              onSelect={onGlobalSearch}
+            />
+          </div>
+          <div className="border-t border-slate-100 pt-4 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+            <p className="text-xs font-semibold uppercase text-slate-400">Knowledge Assets</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <KnowledgeMetric label="内置题" value={obcpQuestions.length} />
+              <KnowledgeMetric label="自定义题" value={dashboardData.customQuestionCount} />
+              <KnowledgeMetric label="内置案例" value={troubleshootingCases.length} />
+              <KnowledgeMetric label="自定义案例" value={dashboardData.customCaseCount} />
+              <KnowledgeMetric label="架构模型" value={architecture.modelCount} wide />
+            </div>
+          </div>
+        </div>
       </section>
 
       <section>
@@ -309,6 +363,33 @@ function SmallMetric({ icon: Icon, label, value }: { icon: typeof CheckCircle2; 
 
 function OverviewMetric({ label, value }: { label: string; value: number }) {
   return <div className="bg-slate-50 px-4 py-4"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-2xl font-semibold text-ink">{value}</p></div>
+}
+
+function DashboardSearchTerms({
+  title,
+  items,
+  emptyText,
+  onSelect,
+}: {
+  title: string
+  items: string[]
+  emptyText?: string
+  onSelect: (query: string) => void
+}) {
+  return (
+    <div className="mt-4 flex items-start gap-3">
+      <span className="w-16 shrink-0 pt-1 text-[11px] font-semibold text-slate-400">{title}</span>
+      {items.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item) => <button key={item} type="button" onClick={() => onSelect(item)} className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600 hover:bg-ocean-50 hover:text-ocean-700">{item}</button>)}
+        </div>
+      ) : <span className="pt-1 text-xs text-slate-400">{emptyText}</span>}
+    </div>
+  )
+}
+
+function KnowledgeMetric({ label, value, wide }: { label: string; value: number; wide?: boolean }) {
+  return <div className={`bg-slate-50 px-3 py-3 ${wide ? 'col-span-2' : ''}`}><p className="text-[11px] text-slate-500">{label}</p><p className="mt-1 text-lg font-semibold text-ink">{value}</p></div>
 }
 
 function ActionButton({ label, onClick, primary }: { label: string; onClick: () => void; primary?: boolean }) {

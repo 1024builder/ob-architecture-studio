@@ -1,7 +1,8 @@
-import { BookOpenCheck, House, Network, Siren } from 'lucide-react'
+import { BookOpenCheck, House, Network, Search, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type AppModuleId = 'dashboard' | 'architecture' | 'question-bank' | 'troubleshooting'
+export type AppModuleId =
+  'dashboard' | 'search' | 'architecture' | 'question-bank' | 'troubleshooting'
 
 export type AppModule = {
   id: AppModuleId
@@ -13,6 +14,14 @@ export type AppModule = {
 }
 
 export const appModules: AppModule[] = [
+  {
+    id: 'search',
+    name: '全局搜索',
+    shortName: '全局搜索',
+    description: '统一检索题库、案例、架构与命令',
+    path: '#/search',
+    icon: Search,
+  },
   {
     id: 'dashboard',
     name: '首页总览',
@@ -48,6 +57,7 @@ export const appModules: AppModule[] = [
 ]
 
 export function getModuleFromHash(hash: string): AppModuleId {
+  if (hash.includes('search')) return 'search'
   if (hash.includes('architecture')) return 'architecture'
   if (hash.includes('troubleshooting')) return 'troubleshooting'
   if (hash.includes('question-bank')) return 'question-bank'

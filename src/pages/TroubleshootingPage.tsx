@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Database, FolderCog, Search, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import type { CaseNavigationRequest } from '../app/contentNavigation'
 import { CaseDetail } from '../components/troubleshooting/CaseDetail'
 import { CaseList } from '../components/troubleshooting/CaseList'
 import { CaseManager } from '../components/troubleshooting/CaseManager'
@@ -15,9 +16,15 @@ import {
 
 type Props = {
   onViewArchitectureComponent: (componentName: string) => void
+  navigationRequest?: CaseNavigationRequest | null
+  onNavigationHandled?: () => void
 }
 
-export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
+export function TroubleshootingPage({
+  onViewArchitectureComponent,
+  navigationRequest,
+  onNavigationHandled,
+}: Props) {
   const [customCases, setCustomCases] = useState(loadCustomTroubleshootingCases)
   const [managerOpen, setManagerOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -25,6 +32,7 @@ export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
   const [faultType, setFaultType] = useState('全部')
   const [severity, setSeverity] = useState<'全部' | TroubleshootingSeverity>('全部')
   const [selectedCaseId, setSelectedCaseId] = useState(troubleshootingCases[0]?.caseId)
+  const [navigationNotice, setNavigationNotice] = useState('')
 
   const allCases = useMemo(
     () => mergeTroubleshootingCases(troubleshootingCases, customCases),
@@ -69,12 +77,34 @@ export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
     )
   }, [])
 
+  useEffect(() => {
+    if (!navigationRequest) return
+    const target = allCases.find((item) => item.caseId === navigationRequest.caseId)
+    if (target) {
+      setSearchQuery('')
+      setDatabaseType('全部')
+      setFaultType('全部')
+      setSeverity('全部')
+      setSelectedCaseId(target.caseId)
+      setNavigationNotice('')
+    } else {
+      setNavigationNotice(`未找到案例 ${navigationRequest.caseId}，可能已被删除或尚未同步。`)
+    }
+    onNavigationHandled?.()
+  }, [allCases, navigationRequest, onNavigationHandled])
+
   const selectedCase = filteredCases.find((item) => item.caseId === selectedCaseId)
   const highSeverityCount = allCases.filter((item) => item.severity === '高').length
   const resolvedCount = allCases.filter((item) => item.status === '已解决').length
 
   return (
     <div className="space-y-5 p-3 sm:p-4 lg:p-5">
+      {navigationNotice && (
+        <div className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <span>{navigationNotice}</span>
+          <button type="button" onClick={() => setNavigationNotice('')} className="text-xs font-semibold">关闭</button>
+        </div>
+      )}
       <section className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase text-ocean-600">DBA Case Lab</p>
