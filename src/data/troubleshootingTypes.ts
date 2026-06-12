@@ -45,6 +45,7 @@ export type TroubleshootingCase = {
   relatedComponents: string[]
   relatedKnowledgePoints: string[]
   tags: string[]
+  source?: 'built_in' | 'manual_create' | 'json_import' | string
   createdAt: string
   updatedAt: string
 }

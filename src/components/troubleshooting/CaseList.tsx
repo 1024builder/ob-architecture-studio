@@ -39,6 +39,7 @@ export function CaseList({ cases, selectedCaseId, onSelect }: Props) {
                   <span className="text-slate-300">/</span>
                   <span className="text-slate-500">{item.faultType}</span>
                   <span className={`rounded px-1.5 py-0.5 font-semibold ${severityBadge[item.severity]}`}>{item.severity}</span>
+                  {item.source && item.source !== 'built_in' && <span className="rounded bg-violet-50 px-1.5 py-0.5 font-semibold text-violet-700">自定义</span>}
                 </span>
                 <span className="mt-2 block text-sm font-semibold leading-5 text-ink">{item.title}</span>
                 <span className="mt-2 flex flex-wrap gap-1.5">

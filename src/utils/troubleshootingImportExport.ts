@@ -10,6 +10,8 @@ import { downloadTextFile } from './obcpExport'
 
 export const TROUBLESHOOTING_CUSTOM_CASES_STORAGE_KEY =
   'ob-architecture-studio:troubleshooting-custom-cases'
+export const TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT =
+  'ob-architecture-studio:troubleshooting-custom-cases-changed'
 
 export type TroubleshootingImportResult = {
   importedCases: TroubleshootingCase[]
@@ -41,7 +43,9 @@ export function loadCustomTroubleshootingCases(): TroubleshootingCase[] {
     if (!Array.isArray(parsed)) return []
     return parsed.flatMap((item) => {
       const validation = validateTroubleshootingCase(item)
-      return validation.valid ? [validation.item] : []
+      return validation.valid
+        ? [{ ...validation.item, source: validation.item.source ?? 'json_import' }]
+        : []
     })
   } catch {
     return []
@@ -54,6 +58,7 @@ export function saveCustomTroubleshootingCases(items: TroubleshootingCase[]) {
       TROUBLESHOOTING_CUSTOM_CASES_STORAGE_KEY,
       JSON.stringify(items),
     )
+    window.dispatchEvent(new CustomEvent(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT))
   } catch {
     throw new Error('案例保存失败，请检查浏览器存储空间或隐私设置。')
   }
@@ -61,6 +66,7 @@ export function saveCustomTroubleshootingCases(items: TroubleshootingCase[]) {
 
 export function clearCustomTroubleshootingCases() {
   window.localStorage.removeItem(TROUBLESHOOTING_CUSTOM_CASES_STORAGE_KEY)
+  window.dispatchEvent(new CustomEvent(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT))
 }
 
 export function mergeTroubleshootingCases(
@@ -117,7 +123,10 @@ export function importTroubleshootingCases(
       return
     }
     importedIds.add(validation.item.caseId)
-    importedCases.push(validation.item)
+    importedCases.push({
+      ...validation.item,
+      source: validation.item.source ?? 'json_import',
+    })
   })
 
   return {
@@ -145,24 +154,25 @@ export function downloadTroubleshootingCaseTemplate() {
   )
 }
 
-function validateTroubleshootingCase(
+export function validateTroubleshootingCase(
   value: unknown,
 ): { valid: true; item: TroubleshootingCase } | { valid: false; error: string } {
   if (!isRecord(value)) return { valid: false, error: '案例必须是对象。' }
 
+  const normalized = normalizeLegacyCaseFields(value)
   for (const field of ['caseId', 'title', 'faultType', 'summary', 'rootCause'] as const) {
-    if (!isNonEmptyString(value[field])) {
+    if (!isNonEmptyString(normalized[field])) {
       return { valid: false, error: `缺少有效字段 ${field}。` }
     }
   }
-  if (!databaseTypes.includes(value.databaseType as TroubleshootingDatabaseType)) {
+  if (!databaseTypes.includes(normalized.databaseType as TroubleshootingDatabaseType)) {
     return { valid: false, error: 'databaseType 不在支持范围内。' }
   }
-  if (!severities.includes(value.severity as TroubleshootingSeverity)) {
+  if (!severities.includes(normalized.severity as TroubleshootingSeverity)) {
     return { valid: false, error: 'severity 必须为低、中或高。' }
   }
   for (const field of ['symptoms', 'solution', 'tags'] as const) {
-    if (!isStringArray(value[field], true)) {
+    if (!isStringArray(normalized[field], true)) {
       return { valid: false, error: `${field} 必须是非空字符串数组。` }
     }
   }
@@ -171,30 +181,50 @@ function validateTroubleshootingCase(
   return {
     valid: true,
     item: {
-      caseId: value.caseId as string,
-      title: value.title as string,
-      databaseType: value.databaseType as TroubleshootingDatabaseType,
-      faultType: value.faultType as string,
-      severity: value.severity as TroubleshootingSeverity,
-      status: statuses.includes(value.status as TroubleshootingStatus)
-        ? value.status as TroubleshootingStatus
+      caseId: normalized.caseId as string,
+      title: normalized.title as string,
+      databaseType: normalized.databaseType as TroubleshootingDatabaseType,
+      faultType: normalized.faultType as string,
+      severity: normalized.severity as TroubleshootingSeverity,
+      status: statuses.includes(normalized.status as TroubleshootingStatus)
+        ? normalized.status as TroubleshootingStatus
         : '待验证',
-      summary: value.summary as string,
-      symptoms: [...value.symptoms as string[]],
-      impact: isNonEmptyString(value.impact) ? value.impact : '导入案例未提供影响范围说明。',
-      rootCause: value.rootCause as string,
-      troubleshootingSteps: normalizeSteps(value.troubleshootingSteps),
-      commands: normalizeCommands(value.commands),
-      solution: [...value.solution as string[]],
-      verification: isStringArray(value.verification) ? [...value.verification] : [],
-      rollbackPlan: isStringArray(value.rollbackPlan) ? [...value.rollbackPlan] : undefined,
-      lessonsLearned: isStringArray(value.lessonsLearned) ? [...value.lessonsLearned] : [],
-      relatedComponents: isStringArray(value.relatedComponents) ? [...value.relatedComponents] : [],
-      relatedKnowledgePoints: isStringArray(value.relatedKnowledgePoints) ? [...value.relatedKnowledgePoints] : [],
-      tags: [...value.tags as string[]],
-      createdAt: isNonEmptyString(value.createdAt) ? value.createdAt : now,
-      updatedAt: isNonEmptyString(value.updatedAt) ? value.updatedAt : now,
+      summary: normalized.summary as string,
+      symptoms: [...normalized.symptoms as string[]],
+      impact: isNonEmptyString(normalized.impact) ? normalized.impact : '导入案例未提供影响范围说明。',
+      rootCause: normalized.rootCause as string,
+      troubleshootingSteps: normalizeSteps(normalized.troubleshootingSteps),
+      commands: normalizeCommands(normalized.commands),
+      solution: [...normalized.solution as string[]],
+      verification: isStringArray(normalized.verification) ? [...normalized.verification] : [],
+      rollbackPlan: isStringArray(normalized.rollbackPlan) ? [...normalized.rollbackPlan] : undefined,
+      lessonsLearned: isStringArray(normalized.lessonsLearned) ? [...normalized.lessonsLearned] : [],
+      relatedComponents: isStringArray(normalized.relatedComponents) ? [...normalized.relatedComponents] : [],
+      relatedKnowledgePoints: isStringArray(normalized.relatedKnowledgePoints) ? [...normalized.relatedKnowledgePoints] : [],
+      tags: [...normalized.tags as string[]],
+      source: isNonEmptyString(normalized.source) ? normalized.source : undefined,
+      createdAt: isNonEmptyString(normalized.createdAt) ? normalized.createdAt : now,
+      updatedAt: isNonEmptyString(normalized.updatedAt) ? normalized.updatedAt : now,
     },
+  }
+}
+
+function normalizeLegacyCaseFields(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  return {
+    ...value,
+    caseId: value.caseId ?? value.case_id,
+    databaseType: value.databaseType ?? value.database_type,
+    faultType: value.faultType ?? value.fault_type,
+    rootCause: value.rootCause ?? value.root_cause,
+    troubleshootingSteps: value.troubleshootingSteps ?? value.troubleshooting_steps,
+    lessonsLearned: value.lessonsLearned ?? value.lessons_learned,
+    rollbackPlan: value.rollbackPlan ?? value.rollback_plan,
+    relatedComponents: value.relatedComponents ?? value.related_components,
+    relatedKnowledgePoints: value.relatedKnowledgePoints ?? value.related_knowledge_points,
+    createdAt: value.createdAt ?? value.created_at,
+    updatedAt: value.updatedAt ?? value.updated_at,
   }
 }
 
@@ -274,6 +304,7 @@ const troubleshootingCaseTemplate: TroubleshootingCase = {
   relatedComponents: ['OBServer'],
   relatedKnowledgePoints: ['故障诊断'],
   tags: ['自定义案例', '示例'],
+  source: 'json_import',
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
 }

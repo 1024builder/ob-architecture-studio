@@ -10,6 +10,7 @@ import {
   loadCustomTroubleshootingCases,
   mergeTroubleshootingCases,
   saveCustomTroubleshootingCases,
+  TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
 } from '../utils/troubleshootingImportExport'
 
 type Props = {
@@ -55,6 +56,18 @@ export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
       setSelectedCaseId(filteredCases[0].caseId)
     }
   }, [filteredCases, selectedCaseId])
+
+  useEffect(() => {
+    const reloadCustomCases = () => setCustomCases(loadCustomTroubleshootingCases())
+    window.addEventListener(
+      TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
+      reloadCustomCases,
+    )
+    return () => window.removeEventListener(
+      TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
+      reloadCustomCases,
+    )
+  }, [])
 
   const selectedCase = filteredCases.find((item) => item.caseId === selectedCaseId)
   const highSeverityCount = allCases.filter((item) => item.severity === '高').length
@@ -112,6 +125,10 @@ export function TroubleshootingPage({ onViewArchitectureComponent }: Props) {
             const next = [...customCases, ...items]
             saveCustomTroubleshootingCases(next)
             setCustomCases(next)
+          }}
+          onReplaceCustom={(items) => {
+            saveCustomTroubleshootingCases(items)
+            setCustomCases(items)
           }}
           onClearCustom={() => {
             clearCustomTroubleshootingCases()

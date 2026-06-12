@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isSupabaseConfigured, type SupabaseSession } from '../../lib/supabaseClient'
 import { obcpQuestions } from '../../data/obcpQuestions'
+import { troubleshootingCases } from '../../data/troubleshootingCases'
 import {
   AUTH_STATE_CHANGED_EVENT,
   clearExpiredSession,
@@ -26,6 +27,11 @@ import {
 } from '../../services/customQuestionSyncService'
 import { ObcpSyncError, syncObcpData } from '../../services/obcpSyncService'
 import {
+  clearTroubleshootingCaseSyncAccount,
+  syncTroubleshootingCases,
+  TroubleshootingCaseSyncError,
+} from '../../services/troubleshootingCaseSyncService'
+import {
   clearObcpSyncAccount,
   getObcpSyncStatus,
   OBCP_SYNC_STATUS_CHANGED_EVENT,
@@ -40,6 +46,7 @@ import {
   getPendingObcpRecordCount,
   OBCP_LOCAL_DATA_CHANGED_EVENT,
 } from '../../utils/obcpStorage'
+import { loadCustomTroubleshootingCases } from '../../utils/troubleshootingImportExport'
 
 type AuthMode = 'login' | 'register'
 const LOCAL_USER_ID = 'local-user'
@@ -143,6 +150,18 @@ export function UserSyncStatus() {
         }
         throw error
       }
+      try {
+        await syncTroubleshootingCases(
+          activeSession,
+          loadCustomTroubleshootingCases(),
+          new Set(troubleshootingCases.map((item) => item.caseId)),
+        )
+      } catch (error) {
+        if (error instanceof TroubleshootingCaseSyncError
+          && error.requiresLogin) {
+          throw new ObcpSyncError(error.message, true)
+        }
+      }
       setPendingCount(getPendingObcpRecordCount(LOCAL_USER_ID))
       updateObcpSyncStatus({
         loggedIn: true,
@@ -233,6 +252,7 @@ export function UserSyncStatus() {
     setAccountOpen(false)
     setSyncStatus(clearObcpSyncAccount())
     clearCustomQuestionSyncAccount(loadCustomObcpQuestions().length)
+    clearTroubleshootingCaseSyncAccount(loadCustomTroubleshootingCases().length)
   }
 
   if (!isSupabaseConfigured) {

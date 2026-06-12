@@ -35,12 +35,18 @@ import { loadObcpUserState, OBCP_DATA_UPDATED_EVENT } from '../utils/obcpStorage
 import {
   loadCustomTroubleshootingCases,
   mergeTroubleshootingCases,
+  TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
 } from '../utils/troubleshootingImportExport'
 import {
   getObcpSyncStatus,
   OBCP_SYNC_STATUS_CHANGED_EVENT,
   type ObcpSyncStatusSnapshot,
 } from '../services/syncStatusService'
+import {
+  getTroubleshootingCaseSyncStatus,
+  TROUBLESHOOTING_CASE_SYNC_STATUS_CHANGED_EVENT,
+  type TroubleshootingCaseSyncStatus,
+} from '../services/troubleshootingCaseSyncService'
 
 const CURRENT_USER_ID = 'local-user'
 
@@ -53,6 +59,8 @@ export function DashboardPage({ onModuleChange }: Props) {
   const [syncStatus, setSyncStatus] = useState(getObcpSyncStatus)
   const [customQuestionSyncStatus, setCustomQuestionSyncStatus] =
     useState(getCustomQuestionSyncStatus)
+  const [caseSyncStatus, setCaseSyncStatus] =
+    useState(getTroubleshootingCaseSyncStatus)
   useEffect(() => {
     const refreshDashboard = () => setDataRevision((value) => value + 1)
     const refreshSyncStatus = (event: Event) => {
@@ -63,20 +71,34 @@ export function DashboardPage({ onModuleChange }: Props) {
       const detail = (event as CustomEvent<CustomQuestionSyncStatus>).detail
       setCustomQuestionSyncStatus(detail ?? getCustomQuestionSyncStatus())
     }
+    const refreshCaseSyncStatus = (event: Event) => {
+      const detail = (event as CustomEvent<TroubleshootingCaseSyncStatus>).detail
+      setCaseSyncStatus(detail ?? getTroubleshootingCaseSyncStatus())
+    }
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
     window.addEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
+    window.addEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refreshDashboard)
     window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
     window.addEventListener(
       CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
       refreshCustomQuestionSyncStatus,
     )
+    window.addEventListener(
+      TROUBLESHOOTING_CASE_SYNC_STATUS_CHANGED_EVENT,
+      refreshCaseSyncStatus,
+    )
     return () => {
       window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
       window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
+      window.removeEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refreshDashboard)
       window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
       window.removeEventListener(
         CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
         refreshCustomQuestionSyncStatus,
+      )
+      window.removeEventListener(
+        TROUBLESHOOTING_CASE_SYNC_STATUS_CHANGED_EVENT,
+        refreshCaseSyncStatus,
       )
     }
   }, [])
@@ -210,6 +232,11 @@ export function DashboardPage({ onModuleChange }: Props) {
               <SmallMetric icon={CheckCircle2} label="已解决案例" value={`${resolvedCount}`} />
               <SmallMetric icon={GitBranch} label="数据库类型" value={`${databaseTypeCount}`} />
             </div>
+            <CaseSyncHint
+              builtInCount={troubleshootingCases.length}
+              customCount={dashboardData.customCaseCount}
+              status={caseSyncStatus}
+            />
             {recentCase && (
               <div className="mt-4 border-t border-slate-100 pt-4">
                 <p className="text-xs text-slate-500">最近更新案例</p>
@@ -333,6 +360,31 @@ function QuestionBankSyncHint({
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-slate-500">
       <span>内置题库 {builtInCount} 道</span>
       <span>自定义题库 {customCount} 道</span>
+      <span className={status.state === 'failed' ? 'text-rose-700' : ''}>{syncText}</span>
+    </div>
+  )
+}
+
+function CaseSyncHint({
+  builtInCount,
+  customCount,
+  status,
+}: {
+  builtInCount: number
+  customCount: number
+  status: TroubleshootingCaseSyncStatus
+}) {
+  let syncText = status.configured ? '自定义案例当前仅保存在本地' : '本地案例模式'
+  if (status.state === 'syncing') syncText = '故障案例同步中'
+  else if (status.state === 'failed') syncText = '故障案例同步失败，可稍后重试'
+  else if (status.loggedIn && status.state === 'synced') {
+    syncText = `故障案例已同步 · ${formatDate(status.lastSyncAt)}`
+  } else if (status.loggedIn) syncText = '故障案例云同步已开启'
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+      <span>内置案例 {builtInCount} 个</span>
+      <span>自定义案例 {customCount} 个</span>
       <span className={status.state === 'failed' ? 'text-rose-700' : ''}>{syncText}</span>
     </div>
   )
