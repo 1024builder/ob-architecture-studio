@@ -4,6 +4,8 @@ import {
   BookOpenCheck,
   Bookmark,
   CheckCircle2,
+  Cloud,
+  CloudOff,
   Clock3,
   Database,
   GitBranch,
@@ -28,6 +30,11 @@ import {
   loadCustomTroubleshootingCases,
   mergeTroubleshootingCases,
 } from '../utils/troubleshootingImportExport'
+import {
+  getObcpSyncStatus,
+  OBCP_SYNC_STATUS_CHANGED_EVENT,
+  type ObcpSyncStatusSnapshot,
+} from '../services/syncStatusService'
 
 const CURRENT_USER_ID = 'local-user'
 
@@ -37,10 +44,19 @@ type Props = {
 
 export function DashboardPage({ onModuleChange }: Props) {
   const [dataRevision, setDataRevision] = useState(0)
+  const [syncStatus, setSyncStatus] = useState(getObcpSyncStatus)
   useEffect(() => {
     const refreshDashboard = () => setDataRevision((value) => value + 1)
+    const refreshSyncStatus = (event: Event) => {
+      const detail = (event as CustomEvent<ObcpSyncStatusSnapshot>).detail
+      setSyncStatus(detail ?? getObcpSyncStatus())
+    }
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
-    return () => window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+    window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
+    return () => {
+      window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+      window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
+    }
   }, [])
 
   const dashboardData = useMemo(() => {
@@ -130,6 +146,7 @@ export function DashboardPage({ onModuleChange }: Props) {
                 <ActionButton label="查看学习诊断" onClick={() => onModuleChange('question-bank')} />
               </div>
             </div>
+            <SyncHint status={syncStatus} />
             {userSummary.totalAnswered ? (
               <>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -240,6 +257,29 @@ function OverviewMetric({ label, value }: { label: string; value: number }) {
 
 function ActionButton({ label, onClick, primary }: { label: string; onClick: () => void; primary?: boolean }) {
   return <button type="button" onClick={onClick} className={`h-9 rounded-md px-3 text-sm font-semibold transition ${primary ? 'bg-ocean-600 text-white hover:bg-ocean-700' : 'border border-slate-200 bg-white text-slate-600 hover:border-ocean-300 hover:text-ocean-700'}`}>{label}</button>
+}
+
+function SyncHint({ status }: { status: ObcpSyncStatusSnapshot }) {
+  const failed = status.state === 'failed'
+  const Icon = failed || !status.loggedIn ? CloudOff : Cloud
+  let text = '当前为本地记录'
+  if (failed) {
+    text = `同步失败：${status.lastError ?? '已保留本地记录'}`
+  } else if (status.state === 'syncing') {
+    text = '云端同步进行中，本地记录仍可正常使用'
+  } else if (status.loggedIn && status.state === 'synced') {
+    text = `云端同步已开启 · 最近同步 ${formatDate(status.lastSyncAt)}`
+  } else if (status.loggedIn) {
+    text = '云端同步已开启'
+  } else if (status.configured) {
+    text = '未登录，当前为本地记录'
+  }
+  return (
+    <div className={`mt-4 flex items-start gap-2 rounded-md px-3 py-2 text-xs leading-5 ${failed ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-500'}`}>
+      <Icon size={15} className="mt-0.5 shrink-0" />
+      <span>{text}</span>
+    </div>
+  )
 }
 
 function buildRecommendations(totalAnswered: number, correctRate: number, recentPractice: string | undefined, customCaseCount: number) {

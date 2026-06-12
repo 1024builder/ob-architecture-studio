@@ -26,13 +26,9 @@ export function loadObcpUserState(userId: string): ObcpUserState {
     const raw = window.localStorage.getItem(storageKey(userId))
     if (!raw) return createEmptyUserState(userId)
     const parsed = JSON.parse(raw) as Partial<ObcpUserState>
-    const records = Array.isArray(parsed.records)
-      ? parsed.records.map((record) => ({
-        ...record,
-        isNotUnderstood: record.isNotUnderstood ?? false,
-        syncStatus: record.syncStatus ?? 'pending' as const,
-      }))
-      : []
+    const records = normalizeObcpAnswerRecords(
+      Array.isArray(parsed.records) ? parsed.records : [],
+    )
     const knownQuestionIds = new Set([
       ...(Array.isArray(parsed.favoriteQuestionIds) ? parsed.favoriteQuestionIds : []),
       ...(Array.isArray(parsed.wrongBookQuestionIds) ? parsed.wrongBookQuestionIds : []),
@@ -71,7 +67,10 @@ export function appendAnswerRecord(state: ObcpUserState, record: ObcpAnswerRecor
 
   return {
     ...state,
-    records: [...state.records, { ...record, syncStatus: 'pending', syncedAt: undefined }],
+    records: normalizeObcpAnswerRecords([
+      ...state.records,
+      { ...record, syncStatus: 'pending', syncedAt: undefined },
+    ]),
     wrongBookQuestionIds: [...wrongBook],
     questionStateUpdatedAt: {
       ...state.questionStateUpdatedAt,
@@ -154,4 +153,59 @@ export function saveObcpPracticeSessions(
 export function appendObcpPracticeSession(session: ObcpPracticeSession) {
   const sessions = loadObcpPracticeSessions(session.userId)
   saveObcpPracticeSessions(session.userId, [...sessions, session])
+}
+
+export function getPendingObcpRecordCount(userId: string) {
+  return loadObcpUserState(userId).records.filter(
+    (record) => record.syncStatus !== 'synced',
+  ).length
+}
+
+export function normalizeObcpAnswerRecords(records: ObcpAnswerRecord[]) {
+  const normalized: ObcpAnswerRecord[] = []
+  records.forEach((record) => {
+    const next: ObcpAnswerRecord = {
+      ...record,
+      id: record.id || createStableRecordId(record),
+      isNotUnderstood: record.isNotUnderstood ?? false,
+      syncStatus: record.syncStatus ?? 'pending',
+    }
+    const existingIndex = normalized.findIndex((candidate) =>
+      candidate.id === next.id
+      || (
+        candidate.questionId === next.questionId
+        && candidate.answeredAt === next.answeredAt
+      ),
+    )
+    if (existingIndex >= 0) {
+      normalized[existingIndex] = preferSyncedRecord(normalized[existingIndex], next)
+    } else {
+      normalized.push(next)
+    }
+  })
+  return normalized.sort((left, right) => left.answeredAt.localeCompare(right.answeredAt))
+}
+
+function createStableRecordId(record: ObcpAnswerRecord) {
+  const source = [
+    record.questionId,
+    record.answeredAt,
+    [...(record.selectedAnswer ?? [])].sort().join(','),
+  ].join('|')
+  let hash = 2166136261
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return `legacy-${record.questionId}-${(hash >>> 0).toString(36)}`
+}
+
+function preferSyncedRecord(
+  current: ObcpAnswerRecord,
+  candidate: ObcpAnswerRecord,
+) {
+  if (current.syncStatus === 'synced' && candidate.syncStatus !== 'synced') {
+    return { ...candidate, id: current.id, syncStatus: 'synced' as const, syncedAt: current.syncedAt }
+  }
+  return { ...current, ...candidate, id: current.id || candidate.id }
 }

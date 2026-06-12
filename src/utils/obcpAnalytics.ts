@@ -9,13 +9,15 @@ import type {
   WeakPointDiagnosis,
   WrongQuestionStat,
 } from '../data/obcpTypes'
+import { normalizeObcpAnswerRecords } from './obcpStorage'
 
 export function calculateObcpAnalytics(
   userState: ObcpUserState,
   questions: ObcpQuestion[],
 ): ObcpAnalytics {
   const questionById = new Map(questions.map((question) => [question.questionId, question]))
-  const records = userState.records.filter((record) => questionById.has(record.questionId))
+  const records = normalizeObcpAnswerRecords(userState.records)
+    .filter((record) => questionById.has(record.questionId))
   const availableQuestionIds = new Set(questionById.keys())
   const latestRecord = [...records].sort((a, b) => b.answeredAt.localeCompare(a.answeredAt))[0]
   const totalCorrect = records.filter((record) => record.isCorrect).length

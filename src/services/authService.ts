@@ -123,6 +123,11 @@ export async function signOut() {
   notifyAuthChanged()
 }
 
+export function clearExpiredSession() {
+  window.localStorage.removeItem(AUTH_STORAGE_KEY)
+  notifyAuthChanged()
+}
+
 async function refreshSession(refreshToken: string) {
   try {
     const response = await supabaseRequest<AuthTokenResponse>(

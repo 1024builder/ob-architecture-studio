@@ -3,7 +3,11 @@ import type {
   ObcpPracticeSession,
   ObcpUserState,
 } from '../data/obcpTypes'
-import { supabaseRequest, type SupabaseSession } from '../lib/supabaseClient'
+import {
+  SupabaseRequestError,
+  supabaseRequest,
+  type SupabaseSession,
+} from '../lib/supabaseClient'
 import {
   loadObcpPracticeSessions,
   loadObcpUserState,
@@ -58,35 +62,63 @@ type CloudPracticeSession = {
 }
 
 export async function syncObcpData(session: SupabaseSession) {
-  const [cloudRecords, cloudStates, cloudSessions] = await Promise.all([
-    selectRows<CloudAnswerRecord>('obcp_answer_records', session),
-    selectRows<CloudQuestionState>('obcp_question_states', session),
-    selectRows<CloudPracticeSession>('obcp_practice_sessions', session),
-  ])
+  try {
+    const [cloudRecords, cloudStates, cloudSessions] = await Promise.all([
+      selectRows<CloudAnswerRecord>('obcp_answer_records', session),
+      selectRows<CloudQuestionState>('obcp_question_states', session),
+      selectRows<CloudPracticeSession>('obcp_practice_sessions', session),
+    ])
 
-  const localState = loadObcpUserState(LOCAL_USER_ID)
-  const localSessions = loadObcpPracticeSessions(LOCAL_USER_ID)
-  const mergedRecords = mergeRecords(localState.records, cloudRecords.map(fromCloudRecord))
-  const mergedState = mergeQuestionStates(localState, cloudStates, mergedRecords)
-  const mergedSessions = mergeSessions(localSessions, cloudSessions.map(fromCloudSession))
-  const syncedAt = new Date().toISOString()
+    const localState = loadObcpUserState(LOCAL_USER_ID)
+    const localSessions = loadObcpPracticeSessions(LOCAL_USER_ID)
+    const mergedRecords = mergeRecords(localState.records, cloudRecords.map(fromCloudRecord))
+    const mergedState = mergeQuestionStates(localState, cloudStates, mergedRecords)
+    const mergedSessions = mergeSessions(localSessions, cloudSessions.map(fromCloudSession))
+    const syncedAt = new Date().toISOString()
+    const cloudRecordKeys = new Set(cloudRecords.flatMap((item) => [
+      item.record_id,
+      `${item.question_id}:${item.answered_at}`,
+    ]))
+    const recordsToUpload = mergedRecords.filter((record) =>
+      record.syncStatus !== 'synced'
+      || !cloudRecordKeys.has(record.id)
+      || !cloudRecordKeys.has(`${record.questionId}:${record.answeredAt}`),
+    )
+    const cloudSessionIds = new Set(cloudSessions.map((item) => item.session_id))
+    const sessionsToUpload = mergedSessions.filter((item) =>
+      item.syncStatus !== 'synced' || !cloudSessionIds.has(item.id),
+    )
 
-  await Promise.all([
-    upsertRows('obcp_answer_records', mergedRecords.map((record) => toCloudRecord(record, session.user.id, syncedAt)), session, 'user_id,record_id'),
-    upsertRows('obcp_question_states', buildCloudQuestionStates(mergedState, session.user.id), session, 'user_id,question_id'),
-    upsertRows('obcp_practice_sessions', mergedSessions.map((item) => toCloudSession(item, session.user.id, syncedAt)), session, 'user_id,session_id'),
-  ])
+    await Promise.all([
+      upsertRows('obcp_answer_records', recordsToUpload.map((record) => toCloudRecord(record, session.user.id, syncedAt)), session, 'user_id,record_id'),
+      upsertRows('obcp_question_states', buildCloudQuestionStates(mergedState, session.user.id), session, 'user_id,question_id'),
+      upsertRows('obcp_practice_sessions', sessionsToUpload.map((item) => toCloudSession(item, session.user.id, syncedAt)), session, 'user_id,session_id'),
+    ])
 
-  saveObcpUserState({
-    ...mergedState,
-    records: mergedRecords.map((record) => ({ ...record, syncStatus: 'synced', syncedAt })),
-  }, false)
-  saveObcpPracticeSessions(
-    LOCAL_USER_ID,
-    mergedSessions.map((item) => ({ ...item, syncStatus: 'synced', syncedAt })),
-    false,
-  )
-  window.dispatchEvent(new CustomEvent(OBCP_DATA_UPDATED_EVENT))
+    saveObcpUserState({
+      ...mergedState,
+      records: mergedRecords.map((record) => ({ ...record, syncStatus: 'synced', syncedAt })),
+    }, false)
+    saveObcpPracticeSessions(
+      LOCAL_USER_ID,
+      mergedSessions.map((item) => ({ ...item, syncStatus: 'synced', syncedAt })),
+      false,
+    )
+    window.dispatchEvent(new CustomEvent(OBCP_DATA_UPDATED_EVENT))
+    return { syncedAt }
+  } catch (error) {
+    throw normalizeSyncError(error)
+  }
+}
+
+export class ObcpSyncError extends Error {
+  requiresLogin: boolean
+
+  constructor(message: string, requiresLogin = false) {
+    super(message)
+    this.name = 'ObcpSyncError'
+    this.requiresLogin = requiresLogin
+  }
 }
 
 async function selectRows<T>(table: string, session: SupabaseSession) {
@@ -126,7 +158,10 @@ function mergeRecords(local: ObcpAnswerRecord[], cloud: ObcpAnswerRecord[]) {
       ),
     )
     const normalized = { ...record, userId: LOCAL_USER_ID }
-    if (index >= 0) merged[index] = { ...merged[index], ...normalized }
+    if (index >= 0) {
+      const existing = merged[index]
+      merged[index] = { ...existing, ...normalized, id: existing.id }
+    }
     else merged.push(normalized)
   })
   return merged.sort((left, right) => left.answeredAt.localeCompare(right.answeredAt))
@@ -271,4 +306,20 @@ function fromCloudSession(item: CloudPracticeSession): ObcpPracticeSession {
     syncStatus: 'synced',
     syncedAt: item.synced_at,
   }
+}
+
+function normalizeSyncError(error: unknown) {
+  if (error instanceof SupabaseRequestError) {
+    if (error.status === 401) {
+      return new ObcpSyncError('登录状态已失效，请重新登录。', true)
+    }
+    if (error.status === 403) {
+      return new ObcpSyncError('Supabase RLS 权限校验失败，请检查访问策略。')
+    }
+    if (!error.status) {
+      return new ObcpSyncError(error.message || '网络异常，无法连接 Supabase。')
+    }
+    return new ObcpSyncError(`云端写入或更新失败（HTTP ${error.status}）。`)
+  }
+  return new ObcpSyncError('同步失败，已保留本地记录。')
 }

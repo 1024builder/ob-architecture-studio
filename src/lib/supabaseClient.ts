@@ -26,6 +26,16 @@ export const supabaseConfig = isSupabaseConfigured
   ? { url: url as string, anonKey: anonKey as string }
   : null
 
+export class SupabaseRequestError extends Error {
+  status?: number
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'SupabaseRequestError'
+    this.status = status
+  }
+}
+
 function normalizeConfigValue(value?: string) {
   const normalized = value?.trim()
   return normalized && !normalized.startsWith('%VITE_') ? normalized : undefined
@@ -36,19 +46,27 @@ export async function supabaseRequest<T>(
   options: RequestInit = {},
   accessToken?: string,
 ): Promise<T> {
-  if (!supabaseConfig) throw new Error('Supabase is not configured.')
-  const response = await fetch(`${supabaseConfig.url}${path}`, {
-    ...options,
-    headers: {
-      apikey: supabaseConfig.anonKey,
-      Authorization: `Bearer ${accessToken ?? supabaseConfig.anonKey}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  if (!supabaseConfig) throw new SupabaseRequestError('Supabase 环境变量未配置。')
+  let response: Response
+  try {
+    response = await fetch(`${supabaseConfig.url}${path}`, {
+      ...options,
+      headers: {
+        apikey: supabaseConfig.anonKey,
+        Authorization: `Bearer ${accessToken ?? supabaseConfig.anonKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  } catch {
+    throw new SupabaseRequestError('网络异常，无法连接 Supabase。')
+  }
   if (!response.ok) {
     const message = await response.text()
-    throw new Error(message || `Supabase request failed: ${response.status}`)
+    throw new SupabaseRequestError(
+      message || `Supabase request failed: ${response.status}`,
+      response.status,
+    )
   }
   if (response.status === 204) return undefined as T
   const text = await response.text()
