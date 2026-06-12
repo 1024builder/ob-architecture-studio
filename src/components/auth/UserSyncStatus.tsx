@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isSupabaseConfigured, type SupabaseSession } from '../../lib/supabaseClient'
+import { obcpQuestions } from '../../data/obcpQuestions'
 import {
   AUTH_STATE_CHANGED_EVENT,
   clearExpiredSession,
@@ -18,6 +19,11 @@ import {
   signOut,
   signUpWithPassword,
 } from '../../services/authService'
+import {
+  clearCustomQuestionSyncAccount,
+  CustomQuestionSyncError,
+  syncCustomQuestionBank,
+} from '../../services/customQuestionSyncService'
 import { ObcpSyncError, syncObcpData } from '../../services/obcpSyncService'
 import {
   clearObcpSyncAccount,
@@ -27,6 +33,9 @@ import {
   type ObcpSyncState,
   type ObcpSyncStatusSnapshot,
 } from '../../services/syncStatusService'
+import {
+  loadCustomObcpQuestions,
+} from '../../utils/obcpQuestionImportExport'
 import {
   getPendingObcpRecordCount,
   OBCP_LOCAL_DATA_CHANGED_EVENT,
@@ -122,6 +131,18 @@ export function UserSyncStatus() {
     })
     try {
       const result = await syncObcpData(activeSession)
+      try {
+        await syncCustomQuestionBank(
+          activeSession,
+          loadCustomObcpQuestions(),
+          new Set(obcpQuestions.map((question) => question.questionId)),
+        )
+      } catch (error) {
+        if (error instanceof CustomQuestionSyncError) {
+          throw new ObcpSyncError(error.message, error.requiresLogin)
+        }
+        throw error
+      }
       setPendingCount(getPendingObcpRecordCount(LOCAL_USER_ID))
       updateObcpSyncStatus({
         loggedIn: true,
@@ -211,6 +232,7 @@ export function UserSyncStatus() {
     setSession(null)
     setAccountOpen(false)
     setSyncStatus(clearObcpSyncAccount())
+    clearCustomQuestionSyncAccount(loadCustomObcpQuestions().length)
   }
 
   if (!isSupabaseConfigured) {

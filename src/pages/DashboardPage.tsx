@@ -22,8 +22,14 @@ import { obcpQuestions } from '../data/obcpQuestions'
 import { troubleshootingCases } from '../data/troubleshootingCases'
 import { calculateObcpAnalytics } from '../utils/obcpAnalytics'
 import {
+  CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
+  getCustomQuestionSyncStatus,
+  type CustomQuestionSyncStatus,
+} from '../services/customQuestionSyncService'
+import {
   loadCustomObcpQuestions,
   mergeObcpQuestions,
+  OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT,
 } from '../utils/obcpQuestionImportExport'
 import { loadObcpUserState, OBCP_DATA_UPDATED_EVENT } from '../utils/obcpStorage'
 import {
@@ -45,23 +51,40 @@ type Props = {
 export function DashboardPage({ onModuleChange }: Props) {
   const [dataRevision, setDataRevision] = useState(0)
   const [syncStatus, setSyncStatus] = useState(getObcpSyncStatus)
+  const [customQuestionSyncStatus, setCustomQuestionSyncStatus] =
+    useState(getCustomQuestionSyncStatus)
   useEffect(() => {
     const refreshDashboard = () => setDataRevision((value) => value + 1)
     const refreshSyncStatus = (event: Event) => {
       const detail = (event as CustomEvent<ObcpSyncStatusSnapshot>).detail
       setSyncStatus(detail ?? getObcpSyncStatus())
     }
+    const refreshCustomQuestionSyncStatus = (event: Event) => {
+      const detail = (event as CustomEvent<CustomQuestionSyncStatus>).detail
+      setCustomQuestionSyncStatus(detail ?? getCustomQuestionSyncStatus())
+    }
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+    window.addEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
     window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
+    window.addEventListener(
+      CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
+      refreshCustomQuestionSyncStatus,
+    )
     return () => {
       window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
+      window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
       window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
+      window.removeEventListener(
+        CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
+        refreshCustomQuestionSyncStatus,
+      )
     }
   }, [])
 
   const dashboardData = useMemo(() => {
     void dataRevision
-    const allQuestions = mergeObcpQuestions(obcpQuestions, loadCustomObcpQuestions())
+    const customQuestions = loadCustomObcpQuestions()
+    const allQuestions = mergeObcpQuestions(obcpQuestions, customQuestions)
     const userState = loadObcpUserState(CURRENT_USER_ID)
     const analytics = calculateObcpAnalytics(userState, allQuestions)
     const customCases = loadCustomTroubleshootingCases()
@@ -72,6 +95,7 @@ export function DashboardPage({ onModuleChange }: Props) {
     return {
       analytics,
       allQuestions,
+      customQuestionCount: customQuestions.length,
       allCases,
       customCaseCount: customCases.length,
       recentCase,
@@ -147,6 +171,11 @@ export function DashboardPage({ onModuleChange }: Props) {
               </div>
             </div>
             <SyncHint status={syncStatus} />
+            <QuestionBankSyncHint
+              builtInCount={obcpQuestions.length}
+              customCount={dashboardData.customQuestionCount}
+              status={customQuestionSyncStatus}
+            />
             {userSummary.totalAnswered ? (
               <>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -278,6 +307,33 @@ function SyncHint({ status }: { status: ObcpSyncStatusSnapshot }) {
     <div className={`mt-4 flex items-start gap-2 rounded-md px-3 py-2 text-xs leading-5 ${failed ? 'bg-rose-50 text-rose-700' : 'bg-slate-50 text-slate-500'}`}>
       <Icon size={15} className="mt-0.5 shrink-0" />
       <span>{text}</span>
+    </div>
+  )
+}
+
+function QuestionBankSyncHint({
+  builtInCount,
+  customCount,
+  status,
+}: {
+  builtInCount: number
+  customCount: number
+  status: CustomQuestionSyncStatus
+}) {
+  let syncText = status.configured
+    ? '自定义题库当前仅保存在本地'
+    : '本地题库模式'
+  if (status.state === 'syncing') syncText = '自定义题库同步中'
+  else if (status.state === 'failed') syncText = '自定义题库同步失败，可稍后重试'
+  else if (status.loggedIn && status.state === 'synced') {
+    syncText = `自定义题库已同步 · ${formatDate(status.lastSyncAt)}`
+  } else if (status.loggedIn) syncText = '自定义题库云同步已开启'
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[11px] text-slate-500">
+      <span>内置题库 {builtInCount} 道</span>
+      <span>自定义题库 {customCount} 道</span>
+      <span className={status.state === 'failed' ? 'text-rose-700' : ''}>{syncText}</span>
     </div>
   )
 }

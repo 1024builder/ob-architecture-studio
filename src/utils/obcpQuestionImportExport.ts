@@ -8,6 +8,8 @@ import { downloadTextFile } from './obcpExport'
 
 export const OBCP_CUSTOM_QUESTIONS_STORAGE_KEY =
   'ob-architecture-studio:obcp-custom-questions'
+export const OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT =
+  'ob-architecture-studio:obcp-custom-questions-changed'
 
 export type QuestionImportResult = {
   importedQuestions: ObcpQuestion[]
@@ -41,6 +43,7 @@ export function saveCustomObcpQuestions(questions: ObcpQuestion[]) {
       OBCP_CUSTOM_QUESTIONS_STORAGE_KEY,
       JSON.stringify(questions),
     )
+    window.dispatchEvent(new CustomEvent(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT))
   } catch {
     throw new Error('题库保存失败，请检查浏览器存储空间或隐私设置。')
   }
@@ -48,6 +51,7 @@ export function saveCustomObcpQuestions(questions: ObcpQuestion[]) {
 
 export function clearCustomObcpQuestions() {
   window.localStorage.removeItem(OBCP_CUSTOM_QUESTIONS_STORAGE_KEY)
+  window.dispatchEvent(new CustomEvent(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT))
 }
 
 export function mergeObcpQuestions(
@@ -118,7 +122,13 @@ export function importObcpQuestions(
       return
     }
     importedIds.add(question.questionId)
-    importedQuestions.push(question)
+    const now = new Date().toISOString()
+    importedQuestions.push({
+      ...question,
+      source: question.source ?? 'json_import',
+      createdAt: question.createdAt ?? now,
+      updatedAt: question.updatedAt ?? now,
+    })
   })
 
   return {
@@ -146,7 +156,7 @@ export function downloadQuestionBankTemplate() {
   )
 }
 
-function validateObcpQuestion(
+export function validateObcpQuestion(
   value: unknown,
 ): { valid: true; question: ObcpQuestion } | { valid: false; error: string } {
   if (!isRecord(value)) return { valid: false, error: '题目必须是对象。' }

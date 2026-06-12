@@ -10,6 +10,7 @@ import {
   clearCustomObcpQuestions,
   loadCustomObcpQuestions,
   mergeObcpQuestions,
+  OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT,
   saveCustomObcpQuestions,
 } from '../utils/obcpQuestionImportExport'
 import {
@@ -52,8 +53,13 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
 
   useEffect(() => {
     const reloadSyncedData = () => setUserState(loadObcpUserState(CURRENT_USER_ID))
+    const reloadCustomQuestions = () => setCustomQuestions(loadCustomObcpQuestions())
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, reloadSyncedData)
-    return () => window.removeEventListener(OBCP_DATA_UPDATED_EVENT, reloadSyncedData)
+    window.addEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, reloadCustomQuestions)
+    return () => {
+      window.removeEventListener(OBCP_DATA_UPDATED_EVENT, reloadSyncedData)
+      window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, reloadCustomQuestions)
+    }
   }, [])
 
   function updateUserState(updater: (current: typeof userState) => typeof userState) {
@@ -134,6 +140,10 @@ export function QuestionBankPage({ onViewArchitectureComponent }: Props) {
           const next = [...customQuestions, ...questions]
           saveCustomObcpQuestions(next)
           setCustomQuestions(next)
+        }}
+        onReplaceCustom={(questions) => {
+          saveCustomObcpQuestions(questions)
+          setCustomQuestions(questions)
         }}
         onClearCustom={() => {
           clearCustomObcpQuestions()
