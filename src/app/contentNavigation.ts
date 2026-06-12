@@ -1,5 +1,7 @@
 export type QuestionNavigationRequest = {
-  questionId: string
+  questionId?: string
+  questionIds?: string[]
+  sourceLabel?: string
   requestId: number
 }
 

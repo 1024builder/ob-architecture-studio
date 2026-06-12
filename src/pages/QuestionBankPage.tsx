@@ -72,21 +72,25 @@ export function QuestionBankPage({
 
   useEffect(() => {
     if (!navigationRequest) return
-    const question = allQuestions.find((item) =>
-      item.questionId === navigationRequest.questionId,
-    )
-    if (question) {
-      const isCustomQuestion = customQuestions.some((item) =>
-        item.questionId === question.questionId,
+    const requestedIds = navigationRequest.questionIds
+      ?? (navigationRequest.questionId ? [navigationRequest.questionId] : [])
+    const questions = requestedIds.flatMap((questionId) => {
+      const question = allQuestions.find((item) => item.questionId === questionId)
+      return question ? [question] : []
+    })
+    if (questions.length) {
+      const isCustomQuestion = questions.some((question) =>
+        customQuestions.some((item) => item.questionId === question.questionId),
       )
       setActivePractice({
         mode: 'sequential',
-        questions: [question],
-        sourceLabel: `全局搜索 · ${isCustomQuestion ? '自定义题目' : '内置题目'}`,
+        questions,
+        sourceLabel: navigationRequest.sourceLabel
+          ?? `全局搜索 · ${isCustomQuestion ? '自定义题目' : '内置题目'}`,
       })
       setNavigationNotice('')
     } else {
-      setNavigationNotice(`未找到题目 ${navigationRequest.questionId}，可能已被删除或尚未同步。`)
+      setNavigationNotice('未找到复习题目，题目可能已被删除或尚未同步。')
     }
     onNavigationHandled?.()
   }, [allQuestions, customQuestions, navigationRequest, onNavigationHandled])

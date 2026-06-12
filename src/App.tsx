@@ -6,6 +6,7 @@ import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
 import { ArchitecturePage } from './pages/ArchitecturePage'
 import { DashboardPage } from './pages/DashboardPage'
 import { QuestionBankPage } from './pages/QuestionBankPage'
+import { ReviewCenterPage } from './pages/ReviewCenterPage'
 import { SearchPage } from './pages/SearchPage'
 import { TroubleshootingPage } from './pages/TroubleshootingPage'
 import type { GlobalSearchResult } from './services/globalSearchService'
@@ -36,6 +37,29 @@ function App() {
   function handleGlobalSearch(query = '') {
     setSearchQuery(query)
     handleModuleChange('search')
+  }
+
+  function handleReviewQuestions(questionIds: string[], sourceLabel: string) {
+    setQuestionRequest({
+      questionIds,
+      sourceLabel,
+      requestId: Date.now(),
+    })
+    handleModuleChange('question-bank')
+  }
+
+  function handleReviewArchitecture(modelId: string, componentName?: string) {
+    setArchitectureRequest({
+      modelId,
+      componentName,
+      requestId: Date.now(),
+    })
+    handleModuleChange('architecture')
+  }
+
+  function handleReviewCase(caseId: string) {
+    setCaseRequest({ caseId, requestId: Date.now() })
+    handleModuleChange('troubleshooting')
   }
 
   function handleSearchResult(result: GlobalSearchResult) {
@@ -84,6 +108,13 @@ function App() {
           <SearchPage
             initialQuery={searchQuery}
             onOpenResult={handleSearchResult}
+          />
+        ) : activeModule === 'review' ? (
+          <ReviewCenterPage
+            onPracticeQuestions={handleReviewQuestions}
+            onViewArchitecture={handleReviewArchitecture}
+            onViewCase={handleReviewCase}
+            onGlobalSearch={handleGlobalSearch}
           />
         ) : activeModule === 'architecture' ? (
           <ArchitecturePage

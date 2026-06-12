@@ -11,6 +11,7 @@ import {
   GitBranch,
   Lightbulb,
   Network,
+  RefreshCw,
   Search,
   Siren,
   Target,
@@ -38,6 +39,9 @@ import {
   mergeTroubleshootingCases,
   TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT,
 } from '../utils/troubleshootingImportExport'
+import {
+  buildReviewCenterData,
+} from '../services/reviewCenterService'
 import {
   loadRecentGlobalSearches,
 } from '../services/globalSearchService'
@@ -119,6 +123,13 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
     const allCases = mergeTroubleshootingCases(troubleshootingCases, customCases)
     const allNodes = architectureModels.flatMap((model) => model.nodes)
     const recentCase = [...allCases].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0]
+    const review = buildReviewCenterData({
+      userState,
+      questions: allQuestions,
+      customQuestionIds: new Set(customQuestions.map((item) => item.questionId)),
+      cases: allCases,
+      recentSearches: loadRecentGlobalSearches(),
+    })
 
     return {
       analytics,
@@ -127,6 +138,7 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
       allCases,
       customCaseCount: customCases.length,
       recentCase,
+      review,
       architecture: {
         modelCount: architectureModels.length,
         nodeCount: allNodes.length,
@@ -201,6 +213,25 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
               <KnowledgeMetric label="内置案例" value={troubleshootingCases.length} />
               <KnowledgeMetric label="自定义案例" value={dashboardData.customCaseCount} />
               <KnowledgeMetric label="架构模型" value={architecture.modelCount} wide />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading eyebrow="Daily Review" title="今日复盘" />
+        <div className="mt-3 border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <SmallMetric icon={Target} label="建议复习" value={`${dashboardData.review.todaySuggestedCount} 题`} />
+              <SmallMetric icon={AlertTriangle} label="错题" value={`${dashboardData.review.wrongQuestions.length} 题`} />
+              <SmallMetric icon={Bookmark} label="收藏" value={`${dashboardData.review.favoriteQuestions.length} 题`} />
+              <SmallMetric icon={Lightbulb} label="我不理解" value={`${dashboardData.review.notUnderstoodQuestions.length} 题`} />
+            </div>
+            <div className="min-w-0 border-t border-slate-100 pt-4 lg:w-72 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <p className="text-xs text-slate-500">推荐复习章节</p>
+              <p className="mt-1 truncate text-sm font-semibold text-ink">{dashboardData.review.recommendedChapter ?? 'OceanBase 架构基础'}</p>
+              <button type="button" onClick={() => onModuleChange('review')} className="mt-3 flex h-9 items-center gap-2 rounded-md bg-ocean-600 px-3 text-sm font-semibold text-white hover:bg-ocean-700"><RefreshCw size={15} />进入学习复盘</button>
             </div>
           </div>
         </div>
