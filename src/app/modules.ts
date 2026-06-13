@@ -1,8 +1,8 @@
-import { BookOpenCheck, CalendarCheck2, House, Network, RefreshCw, Search, Siren } from 'lucide-react'
+import { BookOpenCheck, CalendarCheck2, GraduationCap, House, Network, RefreshCw, Search, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type AppModuleId =
-  'dashboard' | 'review' | 'learning-plan' | 'search' | 'architecture' | 'question-bank' | 'troubleshooting'
+  'dashboard' | 'review' | 'learning-plan' | 'search' | 'architecture' | 'question-bank' | 'tax-question-bank' | 'troubleshooting'
 
 export type AppModule = {
   id: AppModuleId
@@ -37,6 +37,14 @@ export const appModules: AppModule[] = [
     description: '章节练习、模拟考试与学习数据',
     path: '#/question-bank',
     icon: BookOpenCheck,
+  },
+  {
+    id: 'tax-question-bank',
+    name: '税务师学习空间',
+    shortName: '税务师题库',
+    description: '税务师多科目题库、章节练习与本地导入',
+    path: '#/tax-question-bank',
+    icon: GraduationCap,
   },
   {
     id: 'troubleshooting',
@@ -74,6 +82,7 @@ export const appModules: AppModule[] = [
 
 export function getModuleFromHash(hash: string): AppModuleId {
   if (hash.includes('learning-plan')) return 'learning-plan'
+  if (hash.includes('tax-question-bank')) return 'tax-question-bank'
   if (hash.includes('review')) return 'review'
   if (hash.includes('search')) return 'search'
   if (hash.includes('architecture')) return 'architecture'

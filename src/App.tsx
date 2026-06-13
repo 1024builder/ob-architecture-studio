@@ -9,6 +9,7 @@ import { LearningPlanPage } from './pages/LearningPlanPage'
 import { QuestionBankPage } from './pages/QuestionBankPage'
 import { ReviewCenterPage } from './pages/ReviewCenterPage'
 import { SearchPage } from './pages/SearchPage'
+import { TaxQuestionBankPage } from './pages/TaxQuestionBankPage'
 import { TroubleshootingPage } from './pages/TroubleshootingPage'
 import type { GlobalSearchResult } from './services/globalSearchService'
 import type { LearningTaskTarget } from './services/learningPlanService'
@@ -153,6 +154,8 @@ function App() {
             onNavigationHandled={handleQuestionNavigationHandled}
             onViewArchitectureComponent={handleArchitectureComponent}
           />
+        ) : activeModule === 'tax-question-bank' ? (
+          <TaxQuestionBankPage />
         ) : (
           <TroubleshootingPage
             navigationRequest={caseRequest}
