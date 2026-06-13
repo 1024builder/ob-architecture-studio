@@ -50,6 +50,8 @@ import { loadCustomTroubleshootingCases } from '../../utils/troubleshootingImpor
 
 type AuthMode = 'login' | 'register'
 const LOCAL_USER_ID = 'local-user'
+export const USER_SIGN_OUT_REQUEST_EVENT =
+  'ob-architecture-studio:user-sign-out-request'
 
 export function UserSyncStatus() {
   const [session, setSession] = useState<SupabaseSession | null>(null)
@@ -106,16 +108,22 @@ export function UserSyncStatus() {
       setSyncStatus(detail ?? getObcpSyncStatus())
     }
 
+    function handleSignOutRequest() {
+      void handleSignOut()
+    }
+
     void initialize()
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChange)
     window.addEventListener(OBCP_LOCAL_DATA_CHANGED_EVENT, handleLocalChange)
     window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, handleSyncStatusChange)
+    window.addEventListener(USER_SIGN_OUT_REQUEST_EVENT, handleSignOutRequest)
     return () => {
       active = false
       window.clearTimeout(syncTimer.current)
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChange)
       window.removeEventListener(OBCP_LOCAL_DATA_CHANGED_EVENT, handleLocalChange)
       window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, handleSyncStatusChange)
+      window.removeEventListener(USER_SIGN_OUT_REQUEST_EVENT, handleSignOutRequest)
     }
   }, [])
 
@@ -319,7 +327,7 @@ export function UserSyncStatus() {
         <span className="hidden max-w-36 truncate lg:inline">{session.user.email ?? '已登录'}</span>
         <span>{syncLabel(syncStatus.state)}</span>
       </button>
-      <button type="button" title="退出登录" onClick={() => void handleSignOut()} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"><LogOut size={15} /></button>
+      <button type="button" title="退出登录" onClick={() => void handleSignOut()} className="hidden h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700 sm:grid"><LogOut size={15} /></button>
       {accountOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/45 p-3 sm:p-6">
           <div className="relative z-[101] max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-md border border-slate-200 bg-white p-4 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-5" role="dialog" aria-modal="true" aria-label="账号与同步状态">
