@@ -15,6 +15,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { TaxMarkdownImportPanel } from '../components/tax/TaxMarkdownImportPanel'
 import { TaxQuestionPractice } from '../components/tax/TaxQuestionPractice'
 import type {
   TaxPracticeMode,
@@ -47,6 +48,7 @@ export function TaxQuestionBankPage() {
   const [revision, setRevision] = useState(0)
   const [activePractice, setActivePractice] = useState<ActivePractice | null>(null)
   const [message, setMessage] = useState('')
+  const [markdownImportOpen, setMarkdownImportOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const banks = useMemo(() => {
     void revision
@@ -160,6 +162,7 @@ export function TaxQuestionBankPage() {
         <div className="flex flex-wrap gap-2">
           <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); event.currentTarget.value = '' }} />
           <ActionButton icon={Upload} label="导入 JSON" onClick={() => fileInputRef.current?.click()} />
+          <ActionButton icon={FileCode2} label="Markdown 解析" onClick={() => setMarkdownImportOpen(true)} />
           <ActionButton icon={Download} label="导出 JSON" disabled={!banks.length} onClick={() => downloadTaxQuestionBanks(banks)} />
           <ActionButton icon={FileCode2} label="下载模板" onClick={downloadTaxQuestionBankTemplate} />
           <ActionButton icon={Trash2} label="清空本地题库" danger disabled={!banks.length} onClick={() => { if (window.confirm('确定清空本地税务师题库吗？答题记录和题目状态将保留。')) { clearTaxQuestionBanks(); setMessage('本地税务师题库已清空。') } }} />
@@ -236,7 +239,7 @@ export function TaxQuestionBankPage() {
           <section className="border border-dashed border-slate-300 bg-white p-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-ink"><FileCode2 size={17} />Markdown 题库解析（实验）</div>
             <p className="mt-2 text-xs leading-6 text-slate-500">Markdown 解析受 OCR 质量影响，建议先转换为标准 JSON 后导入。</p>
-            <button type="button" disabled className="mt-3 h-9 rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-400">功能预留</button>
+            <button type="button" onClick={() => setMarkdownImportOpen(true)} className="mt-3 h-9 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">开始解析导入</button>
           </section>
 
           {!!banks.length && (
@@ -250,6 +253,19 @@ export function TaxQuestionBankPage() {
           )}
         </div>
       </section>
+      {markdownImportOpen && (
+        <TaxMarkdownImportPanel
+          existingBanks={banks}
+          onClose={() => setMarkdownImportOpen(false)}
+          onImport={({ bank, addedCount, skippedCount, warningCount }) => {
+            saveTaxQuestionBanks([...banks, bank])
+            setActiveTaxBankId(bank.bankId)
+            setActiveBank(bank.bankId)
+            setMarkdownImportOpen(false)
+            setMessage(`Markdown 题库导入完成：新增 ${addedCount} 题，跳过重复 ${skippedCount} 题，保留警告 ${warningCount} 题。`)
+          }}
+        />
+      )}
     </div>
   )
 }
