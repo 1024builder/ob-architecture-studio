@@ -39,6 +39,14 @@ import {
   downloadReviewMarkdown,
   generateReviewLlmText,
 } from '../utils/reviewExport'
+import {
+  getLearningGoalLabel,
+  getTaskProgress,
+  getWeeklyCompletedDays,
+  LEARNING_PLAN_CHANGED_EVENT,
+  loadDailyTaskRecord,
+  loadLearningPlan,
+} from '../services/learningPlanService'
 
 const CURRENT_USER_ID = 'local-user'
 
@@ -47,6 +55,7 @@ type Props = {
   onViewArchitecture: (modelId: string, componentName?: string) => void
   onViewCase: (caseId: string) => void
   onGlobalSearch: (query: string) => void
+  onLearningPlan: () => void
 }
 
 export function ReviewCenterPage({
@@ -54,6 +63,7 @@ export function ReviewCenterPage({
   onViewArchitecture,
   onViewCase,
   onGlobalSearch,
+  onLearningPlan,
 }: Props) {
   const [revision, setRevision] = useState(0)
   const [chapterFilter, setChapterFilter] = useState('全部')
@@ -65,10 +75,12 @@ export function ReviewCenterPage({
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, refresh)
     window.addEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refresh)
     window.addEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refresh)
+    window.addEventListener(LEARNING_PLAN_CHANGED_EVENT, refresh)
     return () => {
       window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refresh)
       window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refresh)
       window.removeEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refresh)
+      window.removeEventListener(LEARNING_PLAN_CHANGED_EVENT, refresh)
     }
   }, [])
 
@@ -90,6 +102,9 @@ export function ReviewCenterPage({
   }, [revision])
 
   const account = getStoredSession()?.user.email ?? '本地模式用户'
+  const learningPlan = loadLearningPlan()
+  const taskProgress = getTaskProgress(loadDailyTaskRecord())
+  const weeklyCompletedDays = getWeeklyCompletedDays()
   const filteredWrongQuestions = chapterFilter === '全部'
     ? reviewData.wrongQuestions
     : reviewData.wrongQuestions.filter((item) => item.chapter === chapterFilter)
@@ -158,6 +173,34 @@ export function ReviewCenterPage({
           description="先完成一组 OBCP 练习，复盘中心会据此生成薄弱章节和今日任务。"
         />
       )}
+
+      <section className="border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-400">Learning Plan</p>
+            <h2 className="mt-1 text-lg font-semibold text-ink">学习计划进度</h2>
+            {learningPlan ? (
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+                <span>当前目标：<strong className="text-ink">{getLearningGoalLabel(learningPlan.goal)}</strong></span>
+                <span>今日完成：<strong className="text-ink">{taskProgress.completed}/{taskProgress.total}</strong></span>
+                <span>本周完成：<strong className="text-ink">{weeklyCompletedDays} 天</strong></span>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-500">尚未创建学习计划，可先设置目标和每日学习强度。</p>
+            )}
+            <p className="mt-2 text-xs text-slate-400">
+              {learningPlan
+                ? taskProgress.completed < taskProgress.total
+                  ? '推荐下一步：继续完成今日未完成任务。'
+                  : '今日任务已完成，可以回看薄弱章节或提前预习。'
+                : '推荐下一步：创建一个 30 天学习计划。'}
+            </p>
+          </div>
+          <button type="button" onClick={onLearningPlan} className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-ocean-600 px-4 text-sm font-semibold text-white hover:bg-ocean-700">
+            {learningPlan ? '查看学习计划' : '创建学习计划'}<ArrowRight size={16} />
+          </button>
+        </div>
+      </section>
 
       <section className="border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <SectionHeading eyebrow="Chapter Mastery" title="薄弱章节分析" />

@@ -1,8 +1,8 @@
-import { BookOpenCheck, House, Network, RefreshCw, Search, Siren } from 'lucide-react'
+import { BookOpenCheck, CalendarCheck2, House, Network, RefreshCw, Search, Siren } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 export type AppModuleId =
-  'dashboard' | 'review' | 'search' | 'architecture' | 'question-bank' | 'troubleshooting'
+  'dashboard' | 'review' | 'learning-plan' | 'search' | 'architecture' | 'question-bank' | 'troubleshooting'
 
 export type AppModule = {
   id: AppModuleId
@@ -55,6 +55,14 @@ export const appModules: AppModule[] = [
     icon: RefreshCw,
   },
   {
+    id: 'learning-plan',
+    name: '学习计划与每日任务',
+    shortName: '学习计划',
+    description: '学习目标、每日任务与进度管理',
+    path: '#/learning-plan',
+    icon: CalendarCheck2,
+  },
+  {
     id: 'search',
     name: '全局搜索',
     shortName: '全局搜索',
@@ -65,6 +73,7 @@ export const appModules: AppModule[] = [
 ]
 
 export function getModuleFromHash(hash: string): AppModuleId {
+  if (hash.includes('learning-plan')) return 'learning-plan'
   if (hash.includes('review')) return 'review'
   if (hash.includes('search')) return 'search'
   if (hash.includes('architecture')) return 'architecture'

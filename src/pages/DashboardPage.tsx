@@ -11,6 +11,7 @@ import {
   GitBranch,
   Lightbulb,
   Network,
+  CalendarCheck2,
   RefreshCw,
   Search,
   Siren,
@@ -55,6 +56,12 @@ import {
   TROUBLESHOOTING_CASE_SYNC_STATUS_CHANGED_EVENT,
   type TroubleshootingCaseSyncStatus,
 } from '../services/troubleshootingCaseSyncService'
+import {
+  ensureDailyTasks,
+  getTaskProgress,
+  LEARNING_PLAN_CHANGED_EVENT,
+  loadLearningPlan,
+} from '../services/learningPlanService'
 
 const CURRENT_USER_ID = 'local-user'
 
@@ -88,6 +95,7 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
     window.addEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
     window.addEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
     window.addEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refreshDashboard)
+    window.addEventListener(LEARNING_PLAN_CHANGED_EVENT, refreshDashboard)
     window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
     window.addEventListener(
       CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
@@ -101,6 +109,7 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
       window.removeEventListener(OBCP_DATA_UPDATED_EVENT, refreshDashboard)
       window.removeEventListener(OBCP_CUSTOM_QUESTIONS_CHANGED_EVENT, refreshDashboard)
       window.removeEventListener(TROUBLESHOOTING_CUSTOM_CASES_CHANGED_EVENT, refreshDashboard)
+      window.removeEventListener(LEARNING_PLAN_CHANGED_EVENT, refreshDashboard)
       window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, refreshSyncStatus)
       window.removeEventListener(
         CUSTOM_QUESTION_SYNC_STATUS_CHANGED_EVENT,
@@ -130,6 +139,23 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
       cases: allCases,
       recentSearches: loadRecentGlobalSearches(),
     })
+    const learningPlan = loadLearningPlan()
+    const dailyTasks = learningPlan
+      ? ensureDailyTasks(learningPlan, {
+        questions: allQuestions,
+        userState,
+        review,
+        cases: allCases,
+        recentSearches: loadRecentGlobalSearches(),
+      })
+      : null
+    const dailyProgress = getTaskProgress(dailyTasks)
+    const practiceQuestionCount = dailyTasks?.tasks
+      .filter((task) => task.target.kind === 'questions' && !task.target.sourceLabel.includes('复盘') && !task.target.sourceLabel.includes('错题') && !task.target.sourceLabel.includes('不理解'))
+      .reduce((sum, task) => sum + (task.target.kind === 'questions' ? task.target.questionIds.length : 0), 0) ?? 0
+    const reviewQuestionCount = dailyTasks?.tasks
+      .filter((task) => task.target.kind === 'questions' && (task.target.sourceLabel.includes('复盘') || task.target.sourceLabel.includes('错题') || task.target.sourceLabel.includes('不理解') || task.target.sourceLabel.includes('收藏')))
+      .reduce((sum, task) => sum + (task.target.kind === 'questions' ? task.target.questionIds.length : 0), 0) ?? 0
 
     return {
       analytics,
@@ -139,6 +165,11 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
       customCaseCount: customCases.length,
       recentCase,
       review,
+      learningPlan,
+      dailyTasks,
+      dailyProgress,
+      practiceQuestionCount,
+      reviewQuestionCount,
       architecture: {
         modelCount: architectureModels.length,
         nodeCount: allNodes.length,
@@ -215,6 +246,38 @@ export function DashboardPage({ onModuleChange, onGlobalSearch }: Props) {
               <KnowledgeMetric label="架构模型" value={architecture.modelCount} wide />
             </div>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <SectionHeading eyebrow="Daily Tasks" title="今日任务" />
+        <div className="mt-3 border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          {dashboardData.learningPlan ? (
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 flex-1">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <SmallMetric icon={CalendarCheck2} label="今日任务" value={`${dashboardData.dailyProgress.total} 项`} />
+                  <SmallMetric icon={CheckCircle2} label="已完成" value={`${dashboardData.dailyProgress.completed} 项`} />
+                  <SmallMetric icon={BookOpenCheck} label="建议刷题" value={`${dashboardData.practiceQuestionCount} 题`} />
+                  <SmallMetric icon={RefreshCw} label="建议复盘" value={`${dashboardData.reviewQuestionCount} 题`} />
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><span className="block h-full rounded-full bg-ocean-500" style={{ width: `${dashboardData.dailyProgress.percent}%` }} /></div>
+              </div>
+              <div className="min-w-0 border-t border-slate-100 pt-4 lg:w-72 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                <p className="text-xs text-slate-500">今日最重要任务</p>
+                <p className="mt-1 line-clamp-2 text-sm font-semibold text-ink">
+                  {dashboardData.dailyTasks?.tasks.find((task) => task.status !== 'completed')?.title
+                    ?? (dashboardData.dailyProgress.total ? '今日任务已全部完成' : '今天是计划休息日')}
+                </p>
+                <button type="button" onClick={() => onModuleChange('learning-plan')} className="mt-3 flex h-9 items-center gap-2 rounded-md bg-ocean-600 px-3 text-sm font-semibold text-white hover:bg-ocean-700">继续学习<ArrowRight size={15} /></button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div><p className="text-sm font-semibold text-slate-700">尚未创建学习计划</p><p className="mt-1 text-xs text-slate-500">设置学习目标和每日强度后，系统会自动生成最多 8 项今日任务。</p></div>
+              <button type="button" onClick={() => onModuleChange('learning-plan')} className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-md bg-ocean-600 px-4 text-sm font-semibold text-white hover:bg-ocean-700"><CalendarCheck2 size={16} />创建学习计划</button>
+            </div>
+          )}
         </div>
       </section>
 

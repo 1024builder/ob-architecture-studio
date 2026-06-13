@@ -5,11 +5,13 @@ import { AppShell } from './app/AppShell'
 import { appModules, getModuleFromHash, type AppModuleId } from './app/modules'
 import { ArchitecturePage } from './pages/ArchitecturePage'
 import { DashboardPage } from './pages/DashboardPage'
+import { LearningPlanPage } from './pages/LearningPlanPage'
 import { QuestionBankPage } from './pages/QuestionBankPage'
 import { ReviewCenterPage } from './pages/ReviewCenterPage'
 import { SearchPage } from './pages/SearchPage'
 import { TroubleshootingPage } from './pages/TroubleshootingPage'
 import type { GlobalSearchResult } from './services/globalSearchService'
+import type { LearningTaskTarget } from './services/learningPlanService'
 
 function App() {
   const [activeModule, setActiveModule] = useState<AppModuleId>(() => getModuleFromHash(window.location.hash))
@@ -39,10 +41,15 @@ function App() {
     handleModuleChange('search')
   }
 
-  function handleReviewQuestions(questionIds: string[], sourceLabel: string) {
+  function handleReviewQuestions(
+    questionIds: string[],
+    sourceLabel: string,
+    mode?: QuestionNavigationRequest['mode'],
+  ) {
     setQuestionRequest({
       questionIds,
       sourceLabel,
+      mode,
       requestId: Date.now(),
     })
     handleModuleChange('question-bank')
@@ -60,6 +67,22 @@ function App() {
   function handleReviewCase(caseId: string) {
     setCaseRequest({ caseId, requestId: Date.now() })
     handleModuleChange('troubleshooting')
+  }
+
+  function handleLearningTask(target: LearningTaskTarget) {
+    if (target.kind === 'questions') {
+      handleReviewQuestions(target.questionIds, target.sourceLabel, target.mode)
+      return
+    }
+    if (target.kind === 'architecture') {
+      handleReviewArchitecture(target.modelId, target.componentName)
+      return
+    }
+    if (target.kind === 'case') {
+      handleReviewCase(target.caseId)
+      return
+    }
+    handleGlobalSearch(target.query)
   }
 
   function handleSearchResult(result: GlobalSearchResult) {
@@ -115,7 +138,10 @@ function App() {
             onViewArchitecture={handleReviewArchitecture}
             onViewCase={handleReviewCase}
             onGlobalSearch={handleGlobalSearch}
+            onLearningPlan={() => handleModuleChange('learning-plan')}
           />
+        ) : activeModule === 'learning-plan' ? (
+          <LearningPlanPage onStartTask={handleLearningTask} />
         ) : activeModule === 'architecture' ? (
           <ArchitecturePage
             navigationRequest={architectureRequest}

@@ -83,7 +83,7 @@ export function QuestionBankPage({
         customQuestions.some((item) => item.questionId === question.questionId),
       )
       setActivePractice({
-        mode: 'sequential',
+        mode: navigationRequest.mode ?? 'sequential',
         questions,
         sourceLabel: navigationRequest.sourceLabel
           ?? `全局搜索 · ${isCustomQuestion ? '自定义题目' : '内置题目'}`,
