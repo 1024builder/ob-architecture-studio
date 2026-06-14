@@ -8,13 +8,14 @@ import {
   XCircle,
   X,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
   TaxPracticeMode,
   TaxQuestion,
   TaxQuestionState,
 } from '../../data/taxQuestionTypes'
+import type { TaxSyncState } from '../../services/taxQuestionSyncService'
 import {
   appendTaxAnswerRecord,
   updateTaxQuestionState,
@@ -27,6 +28,7 @@ type Props = {
   states: TaxQuestionState[]
   onClose: () => void
   onDataChange: () => void
+  syncState?: TaxSyncState
 }
 
 type SessionAnswer = {
@@ -42,11 +44,13 @@ export function TaxQuestionPractice({
   states,
   onClose,
   onDataChange,
+  syncState = 'local',
 }: Props) {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, SessionAnswer>>({})
   const [navigatorOpen, setNavigatorOpen] = useState(false)
   const resultRef = useRef<HTMLDivElement>(null)
+  const questionStartedAt = useRef(Date.now())
   const question = questions[index]
   const current = answers[question.questionId] ?? {
     selected: [],
@@ -61,6 +65,10 @@ export function TaxQuestionPractice({
     () => Object.values(answers).filter((item) => item.submitted).length,
     [answers],
   )
+
+  useEffect(() => {
+    questionStartedAt.current = Date.now()
+  }, [question.questionId])
 
   function selectAnswer(key: string) {
     if (current.submitted) return
@@ -93,6 +101,8 @@ export function TaxQuestionPractice({
       correctAnswer: question.answer,
       isCorrect,
       answeredAt: new Date().toISOString(),
+      durationSeconds: Math.max(1, Math.round((Date.now() - questionStartedAt.current) / 1000)),
+      practiceMode: mode,
     })
     if (isCorrect === false) {
       updateTaxQuestionState(question.questionId, { isWrongBook: true })
@@ -122,6 +132,9 @@ export function TaxQuestionPractice({
           <div className="text-right">
             <p className="text-xs text-slate-400">{practiceModeLabel(mode)}</p>
             <p className="mt-1 text-sm font-semibold text-ink">{index + 1} / {questions.length} · 已提交 {answeredCount}</p>
+            <p className={`mt-1 text-[11px] ${syncState === 'failed' ? 'text-rose-600' : syncState === 'synced' ? 'text-emerald-600' : 'text-slate-400'}`}>
+              {taxSyncLabel(syncState)}
+            </p>
           </div>
           <button type="button" onClick={() => setNavigatorOpen(true)} className="grid h-9 w-9 place-items-center rounded-md border border-slate-200 bg-white text-slate-600" title="打开题卡">
             <Grid3X3 size={17} />
@@ -350,4 +363,12 @@ function difficultyLabel(value: TaxQuestion['difficulty']) {
 
 function practiceModeLabel(mode: TaxPracticeMode) {
   return mode === 'random' ? '随机练习' : mode === 'wrongBook' ? '错题重做' : mode === 'favorite' ? '收藏题练习' : '顺序练习'
+}
+
+function taxSyncLabel(state: TaxSyncState) {
+  if (state === 'syncing') return '本地已保存，云端同步中'
+  if (state === 'synced') return '本地已保存，云端已同步'
+  if (state === 'failed') return '本地已保存，云同步失败'
+  if (state === 'signedOut') return '本地已保存，登录后可同步'
+  return '本地已保存'
 }

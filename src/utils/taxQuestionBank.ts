@@ -49,15 +49,23 @@ export function loadTaxQuestionBanks(): TaxQuestionBank[] {
   }
 }
 
-export function saveTaxQuestionBanks(banks: TaxQuestionBank[]) {
+export function saveTaxQuestionBanks(banks: TaxQuestionBank[], shouldNotify = true) {
   window.localStorage.setItem(TAX_QUESTIONS_STORAGE_KEY, JSON.stringify(banks))
-  notify()
+  if (shouldNotify) notify()
 }
 
-export function clearTaxQuestionBanks() {
+export function clearTaxQuestionBanks(source: 'local' | 'sync' = 'local') {
   window.localStorage.setItem(TAX_QUESTIONS_STORAGE_KEY, '[]')
   window.localStorage.removeItem(TAX_ACTIVE_BANK_STORAGE_KEY)
-  notify()
+  notifyTaxDataChanged(source)
+}
+
+export function clearAllTaxLocalData(source: 'local' | 'sync' = 'local') {
+  window.localStorage.setItem(TAX_QUESTIONS_STORAGE_KEY, '[]')
+  window.localStorage.setItem(TAX_ANSWER_RECORDS_STORAGE_KEY, '[]')
+  window.localStorage.setItem(TAX_QUESTION_STATES_STORAGE_KEY, '[]')
+  window.localStorage.removeItem(TAX_ACTIVE_BANK_STORAGE_KEY)
+  notifyTaxDataChanged(source)
 }
 
 export function getActiveTaxBankId() {
@@ -73,14 +81,23 @@ export function loadTaxAnswerRecords(): TaxAnswerRecord[] {
   return loadArray<TaxAnswerRecord>(TAX_ANSWER_RECORDS_STORAGE_KEY)
 }
 
+export function saveTaxAnswerRecords(records: TaxAnswerRecord[], shouldNotify = true) {
+  window.localStorage.setItem(TAX_ANSWER_RECORDS_STORAGE_KEY, JSON.stringify(records))
+  if (shouldNotify) notify()
+}
+
 export function appendTaxAnswerRecord(record: TaxAnswerRecord) {
   const records = loadTaxAnswerRecords()
-  window.localStorage.setItem(TAX_ANSWER_RECORDS_STORAGE_KEY, JSON.stringify([...records, record]))
-  notify()
+  saveTaxAnswerRecords([...records, record])
 }
 
 export function loadTaxQuestionStates(): TaxQuestionState[] {
   return loadArray<TaxQuestionState>(TAX_QUESTION_STATES_STORAGE_KEY)
+}
+
+export function saveTaxQuestionStates(states: TaxQuestionState[], shouldNotify = true) {
+  window.localStorage.setItem(TAX_QUESTION_STATES_STORAGE_KEY, JSON.stringify(states))
+  if (shouldNotify) notify()
 }
 
 export function updateTaxQuestionState(
@@ -97,11 +114,7 @@ export function updateTaxQuestionState(
     ...patch,
     updatedAt: new Date().toISOString(),
   }
-  window.localStorage.setItem(
-    TAX_QUESTION_STATES_STORAGE_KEY,
-    JSON.stringify([...states.filter((item) => item.questionId !== questionId), next]),
-  )
-  notify()
+  saveTaxQuestionStates([...states.filter((item) => item.questionId !== questionId), next])
   return next
 }
 
@@ -210,8 +223,12 @@ function loadArray<T>(key: string): T[] {
   }
 }
 
+export function notifyTaxDataChanged(source: 'local' | 'sync' = 'local') {
+  window.dispatchEvent(new CustomEvent(TAX_DATA_CHANGED_EVENT, { detail: { source } }))
+}
+
 function notify() {
-  window.dispatchEvent(new CustomEvent(TAX_DATA_CHANGED_EVENT))
+  notifyTaxDataChanged()
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

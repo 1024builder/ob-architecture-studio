@@ -46,6 +46,7 @@ const TYPE_LABELS: Array<{ pattern: string; type: TaxQuestionType; label: string
 ]
 
 const OBJECTIVE_TYPES: TaxQuestionType[] = ['single', 'multiple', 'judge', 'calculation']
+const SUPPORTED_TYPES: TaxQuestionType[] = ['single', 'multiple', 'judge', 'calculation', 'comprehensive', 'short_answer']
 const ANSWER_LABEL_PATTERN = /^\s*(?:【|\[)?(?:参考)?(?:正确)?答案(?:】|])?\s*[：:]?\s*(.+)$/i
 const CHAPTER_PATTERN = /^(第[一二三四五六七八九十百0-9]+章)\s*(.+)$/
 const QUESTION_PATTERN = /^\s*(\d+)\s*[.．、]\s*(.*)$/
@@ -360,17 +361,43 @@ export function revalidateParsedTaxQuestion(question: ParsedTaxQuestion): Parsed
   }
 }
 
-export function isParsedTaxQuestionImportable(question: ParsedTaxQuestion) {
-  if (!question.questionId.trim() || !question.stem.trim() || !question.chapter.trim()) return false
+export function getParsedTaxQuestionImportBlockReasons(question: ParsedTaxQuestion): string[] {
+  const reasons: string[] = []
   const isSubjective = ['short_answer', 'comprehensive'].includes(question.type)
-  if (isSubjective && !question.explanation.trim() && !question.answer.length) return false
-  if (!isSubjective && (!question.explanation.trim() || question.answer.length === 0)) return false
-  if (OBJECTIVE_TYPES.includes(question.type) && question.type !== 'judge' && question.options.length < 4) return false
-  if (question.type === 'judge' && question.options.length < 2) return false
+
+  if (!question.chapter.trim() || question.chapter === '未识别章节') reasons.push('缺少章节')
+  if (!question.stem.trim()) reasons.push('缺少题干')
+  if (!SUPPORTED_TYPES.includes(question.type)) reasons.push('缺少题型')
+
+  if (isSubjective) {
+    if (!question.answer.length && !question.explanation.trim()) reasons.push('缺少参考答案或解析')
+  } else {
+    if (!question.answer.length) reasons.push('缺少答案')
+    if (!question.explanation.trim()) reasons.push('缺少解析')
+  }
+
+  if (['single', 'multiple', 'calculation'].includes(question.type) && question.options.length < 4) {
+    reasons.push(`客观题选项不足 4 个（当前 ${question.options.length} 个）`)
+  }
+
+  if (question.type === 'judge') {
+    const optionKeys = new Set(question.options.map((option) => option.key))
+    if (!optionKeys.has('正确') || !optionKeys.has('错误')) reasons.push('判断题缺少“正确 / 错误”选项')
+  }
+
   const optionKeys = new Set(question.options.map((option) => option.key))
-  if (question.options.length && question.answer.some((answer) => !optionKeys.has(answer))) return false
-  if (['single', 'judge', 'calculation'].includes(question.type) && question.answer.length !== 1) return false
-  return true
+  if (question.options.length && question.answer.some((answer) => !optionKeys.has(answer))) {
+    reasons.push('答案与选项不匹配')
+  }
+  if (['single', 'judge', 'calculation'].includes(question.type) && question.answer.length > 1) {
+    reasons.push('当前题型只能有一个答案')
+  }
+
+  return Array.from(new Set(reasons))
+}
+
+export function isParsedTaxQuestionImportable(question: ParsedTaxQuestion) {
+  return getParsedTaxQuestionImportBlockReasons(question).length === 0
 }
 
 export function toStandardTaxQuestionBank(

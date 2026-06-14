@@ -56,6 +56,8 @@ export type TaxAnswerRecord = {
   correctAnswer: string[]
   isCorrect: boolean | null
   answeredAt: string
+  durationSeconds?: number
+  practiceMode?: TaxPracticeMode
 }
 
 export type TaxQuestionState = {

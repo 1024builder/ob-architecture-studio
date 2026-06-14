@@ -4,6 +4,8 @@ import {
   BookMarked,
   BookOpenCheck,
   CheckCircle2,
+  Cloud,
+  CloudOff,
   Download,
   Dices,
   FileCode2,
@@ -13,10 +15,19 @@ import {
   Trash2,
   TrendingUp,
   Upload,
+  RefreshCw,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { TaxMarkdownImportPanel } from '../components/tax/TaxMarkdownImportPanel'
 import { TaxQuestionPractice } from '../components/tax/TaxQuestionPractice'
+import { getActiveSession } from '../services/authService'
+import {
+  deleteAllCloudTaxData,
+  getTaxSyncStatus,
+  syncTaxQuestionData,
+  TAX_SYNC_STATUS_CHANGED_EVENT,
+  type TaxSyncStatus,
+} from '../services/taxQuestionSyncService'
 import type {
   TaxPracticeMode,
   TaxQuestion,
@@ -25,6 +36,7 @@ import type {
   TaxSubject,
 } from '../data/taxQuestionTypes'
 import {
+  clearAllTaxLocalData,
   clearTaxQuestionBanks,
   downloadTaxQuestionBanks,
   downloadTaxQuestionBankTemplate,
@@ -49,6 +61,7 @@ export function TaxQuestionBankPage() {
   const [activePractice, setActivePractice] = useState<ActivePractice | null>(null)
   const [message, setMessage] = useState('')
   const [markdownImportOpen, setMarkdownImportOpen] = useState(false)
+  const [taxSyncStatus, setTaxSyncStatus] = useState(getTaxSyncStatus)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const banks = useMemo(() => {
     void revision
@@ -70,9 +83,21 @@ export function TaxQuestionBankPage() {
   const [stateFilter, setStateFilter] = useState<'全部' | '收藏' | '错题'>('全部')
 
   useEffect(() => {
-    const refresh = () => setRevision((value) => value + 1)
+    const refresh = () => {
+      setRevision((value) => value + 1)
+      setTaxSyncStatus(getTaxSyncStatus())
+    }
     window.addEventListener(TAX_DATA_CHANGED_EVENT, refresh)
     return () => window.removeEventListener(TAX_DATA_CHANGED_EVENT, refresh)
+  }, [])
+
+  useEffect(() => {
+    const refresh = (event: Event) => {
+      const detail = (event as CustomEvent<TaxSyncStatus>).detail
+      setTaxSyncStatus(detail ?? getTaxSyncStatus())
+    }
+    window.addEventListener(TAX_SYNC_STATUS_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(TAX_SYNC_STATUS_CHANGED_EVENT, refresh)
   }, [])
 
   useEffect(() => {
@@ -132,6 +157,49 @@ export function TaxQuestionBankPage() {
       setActiveBank(result.banks[0].bankId)
     }
     setMessage(`导入 ${result.importedCount} 个题库，跳过重复 ${result.duplicateCount} 个，无效 ${result.invalidCount} 个。${result.errors[0] ? ` ${result.errors[0]}` : ''}`)
+    if (result.banks.length && taxSyncStatus.loggedIn) {
+      setMessage(`导入 ${result.importedCount} 个题库，已保存到本地并等待云同步。跳过重复 ${result.duplicateCount} 个，无效 ${result.invalidCount} 个。`)
+    }
+  }
+
+  async function syncTaxNow(prefix = '') {
+    const session = await getActiveSession()
+    if (!session) {
+      setMessage(prefix ? `${prefix}。当前为本地模式，登录后可跨设备同步。` : '当前未登录，税务师数据继续保存在本地。')
+      return
+    }
+    try {
+      const result = await syncTaxQuestionData(session)
+      setRevision((value) => value + 1)
+      setMessage(`${prefix ? `${prefix}，` : ''}云同步完成：${result.questionCount} 题，${result.recordCount} 条答题记录。`)
+    } catch (error) {
+      setMessage(`${prefix ? `${prefix}，` : ''}云同步失败，可稍后重试。${error instanceof Error ? ` ${error.message}` : ''}`)
+    }
+  }
+
+  async function clearLocalOnly() {
+    if (!window.confirm('仅清空当前浏览器中的税务师题库吗？云端题库和本地答题记录、题目状态将保留。')) return
+    clearTaxQuestionBanks('sync')
+    setTaxSyncStatus(getTaxSyncStatus())
+    setMessage('已仅清空当前浏览器题库。登录状态下可通过手动同步从云端恢复。')
+  }
+
+  async function clearLocalAndCloud() {
+    const session = await getActiveSession()
+    if (!session) {
+      setMessage('当前未登录，只能清空本地题库。')
+      return
+    }
+    if (!window.confirm('危险操作：确定删除当前账号的全部云端税务师题库、答题记录和题目状态，并清空本地题库吗？')) return
+    if (!window.confirm('请再次确认：该操作会删除税务师云端学习数据，且无法撤销。')) return
+    try {
+      await deleteAllCloudTaxData(session)
+      clearAllTaxLocalData('sync')
+      setTaxSyncStatus(getTaxSyncStatus())
+      setMessage('本地及云端税务师数据已清空。')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '云端删除失败，本地数据未清空。')
+    }
   }
 
   if (activePractice) {
@@ -144,6 +212,7 @@ export function TaxQuestionBankPage() {
           states={states}
           onClose={() => setActivePractice(null)}
           onDataChange={() => setRevision((value) => value + 1)}
+          syncState={taxSyncStatus.state}
         />
       </div>
     )
@@ -165,11 +234,35 @@ export function TaxQuestionBankPage() {
           <ActionButton icon={FileCode2} label="Markdown 解析" onClick={() => setMarkdownImportOpen(true)} />
           <ActionButton icon={Download} label="导出 JSON" disabled={!banks.length} onClick={() => downloadTaxQuestionBanks(banks)} />
           <ActionButton icon={FileCode2} label="下载模板" onClick={downloadTaxQuestionBankTemplate} />
-          <ActionButton icon={Trash2} label="清空本地题库" danger disabled={!banks.length} onClick={() => { if (window.confirm('确定清空本地税务师题库吗？答题记录和题目状态将保留。')) { clearTaxQuestionBanks(); setMessage('本地税务师题库已清空。') } }} />
+          <ActionButton icon={Trash2} label="仅清空本地" danger disabled={!banks.length} onClick={() => void clearLocalOnly()} />
+          {taxSyncStatus.loggedIn && <ActionButton icon={CloudOff} label="清空本地及云端" danger onClick={() => void clearLocalAndCloud()} />}
         </div>
       </section>
 
       {message && <div className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"><span>{message}</span><button type="button" onClick={() => setMessage('')} className="text-xs font-semibold">关闭</button></div>}
+
+      <section className={`flex flex-col gap-3 border px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${taxSyncStatus.state === 'failed' ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50/60'}`}>
+        <div className="flex items-start gap-3">
+          <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-md ${taxSyncStatus.loggedIn ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-slate-500'}`}>
+            {taxSyncStatus.loggedIn ? <Cloud size={18} /> : <CloudOff size={18} />}
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">{taxSyncStatus.loggedIn ? '税务师云同步已开启' : '当前为本地题库模式'}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              {taxSyncStatus.loggedIn
+                ? `${taxSyncStatus.email ?? '当前账号'} · 本地 ${taxSyncStatus.localQuestionCount} 题 / 云端 ${taxSyncStatus.cloudQuestionCount} 题 · 本地记录 ${taxSyncStatus.localRecordCount} 条 / 云端 ${taxSyncStatus.cloudRecordCount} 条`
+                : '登录后可跨 Web / 移动端同步税务师题库、答题记录、收藏、错题和“我不理解”。'}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              最近同步：{taxSyncStatus.lastSyncAt ? new Date(taxSyncStatus.lastSyncAt).toLocaleString('zh-CN') : '尚未同步'}
+              {taxSyncStatus.lastError ? ` · ${taxSyncStatus.lastError}` : ''}
+            </p>
+          </div>
+        </div>
+        <button type="button" disabled={!taxSyncStatus.loggedIn || taxSyncStatus.state === 'syncing'} onClick={() => void syncTaxNow()} className="flex h-9 shrink-0 items-center justify-center gap-2 rounded-md border border-emerald-200 bg-white px-3 text-xs font-semibold text-emerald-700 disabled:opacity-45">
+          <RefreshCw size={15} className={taxSyncStatus.state === 'syncing' ? 'animate-spin' : ''} />{taxSyncStatus.state === 'syncing' ? '同步中' : '手动同步'}
+        </button>
+      </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Metric icon={BookOpenCheck} label="总题数" value={allQuestions.length} tone="emerald" />
@@ -248,7 +341,7 @@ export function TaxQuestionBankPage() {
               <select value={activeBankId} onChange={(event) => { setActiveBank(event.target.value); setActiveTaxBankId(event.target.value) }} className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm">
                 {banks.map((bank) => <option key={bank.bankId} value={bank.bankId}>{bank.bankName} · {bank.year}</option>)}
               </select>
-              <p className="mt-2 text-xs text-slate-400">当前导入数据保存在本地浏览器，暂不参与 Supabase 同步。</p>
+              <p className="mt-2 text-xs text-slate-400">题库始终先保存在本地；登录后将通过 Supabase 与同账号设备合并同步。</p>
             </section>
           )}
         </div>
@@ -262,7 +355,7 @@ export function TaxQuestionBankPage() {
             setActiveTaxBankId(bank.bankId)
             setActiveBank(bank.bankId)
             setMarkdownImportOpen(false)
-            setMessage(`Markdown 题库导入完成：新增 ${addedCount} 题，跳过重复 ${skippedCount} 题，保留警告 ${warningCount} 题。`)
+            setMessage(`Markdown 题库导入完成：新增 ${addedCount} 题，跳过重复 ${skippedCount} 题，保留警告 ${warningCount} 题。${taxSyncStatus.loggedIn ? ' 已保存到本地并等待云同步。' : ''}`)
           }}
         />
       )}

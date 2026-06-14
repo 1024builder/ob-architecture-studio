@@ -32,6 +32,14 @@ import {
   TroubleshootingCaseSyncError,
 } from '../../services/troubleshootingCaseSyncService'
 import {
+  clearTaxSyncAccount,
+  getTaxSyncStatus,
+  syncTaxQuestionData,
+  TAX_SYNC_STATUS_CHANGED_EVENT,
+  TaxQuestionSyncError,
+  type TaxSyncStatus,
+} from '../../services/taxQuestionSyncService'
+import {
   clearObcpSyncAccount,
   getObcpSyncStatus,
   OBCP_SYNC_STATUS_CHANGED_EVENT,
@@ -47,6 +55,9 @@ import {
   OBCP_LOCAL_DATA_CHANGED_EVENT,
 } from '../../utils/obcpStorage'
 import { loadCustomTroubleshootingCases } from '../../utils/troubleshootingImportExport'
+import {
+  TAX_DATA_CHANGED_EVENT,
+} from '../../utils/taxQuestionBank'
 
 type AuthMode = 'login' | 'register'
 const LOCAL_USER_ID = 'local-user'
@@ -56,6 +67,7 @@ export const USER_SIGN_OUT_REQUEST_EVENT =
 export function UserSyncStatus() {
   const [session, setSession] = useState<SupabaseSession | null>(null)
   const [syncStatus, setSyncStatus] = useState(getObcpSyncStatus)
+  const [taxSyncStatus, setTaxSyncStatus] = useState(getTaxSyncStatus)
   const [loginOpen, setLoginOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [authMode, setAuthMode] = useState<AuthMode>('login')
@@ -66,6 +78,7 @@ export function UserSyncStatus() {
   const [submitting, setSubmitting] = useState(false)
   const [pendingCount, setPendingCount] = useState(() => getPendingObcpRecordCount(LOCAL_USER_ID))
   const syncTimer = useRef<number>()
+  const taxSyncTimer = useRef<number>()
   const sessionRef = useRef<SupabaseSession | null>(null)
 
   useEffect(() => {
@@ -78,6 +91,7 @@ export function UserSyncStatus() {
       setSession(nextSession)
       if (nextSession) void runSync(nextSession)
       else {
+        setTaxSyncStatus(clearTaxSyncAccount())
         const currentStatus = getObcpSyncStatus()
         const sessionExpired = currentStatus.state === 'failed'
           && currentStatus.lastError?.includes('重新登录')
@@ -103,9 +117,25 @@ export function UserSyncStatus() {
       syncTimer.current = window.setTimeout(() => void runSync(sessionRef.current), 900)
     }
 
+    function handleTaxLocalChange(event: Event) {
+      const source = (event as CustomEvent<{ source?: string }>).detail?.source
+      setTaxSyncStatus(getTaxSyncStatus())
+      if (source === 'sync' || !sessionRef.current) return
+      window.clearTimeout(taxSyncTimer.current)
+      taxSyncTimer.current = window.setTimeout(
+        () => void runTaxSync(sessionRef.current),
+        1200,
+      )
+    }
+
     function handleSyncStatusChange(event: Event) {
       const detail = (event as CustomEvent<ObcpSyncStatusSnapshot>).detail
       setSyncStatus(detail ?? getObcpSyncStatus())
+    }
+
+    function handleTaxSyncStatusChange(event: Event) {
+      const detail = (event as CustomEvent<TaxSyncStatus>).detail
+      setTaxSyncStatus(detail ?? getTaxSyncStatus())
     }
 
     function handleSignOutRequest() {
@@ -116,13 +146,18 @@ export function UserSyncStatus() {
     window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChange)
     window.addEventListener(OBCP_LOCAL_DATA_CHANGED_EVENT, handleLocalChange)
     window.addEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, handleSyncStatusChange)
+    window.addEventListener(TAX_DATA_CHANGED_EVENT, handleTaxLocalChange)
+    window.addEventListener(TAX_SYNC_STATUS_CHANGED_EVENT, handleTaxSyncStatusChange)
     window.addEventListener(USER_SIGN_OUT_REQUEST_EVENT, handleSignOutRequest)
     return () => {
       active = false
       window.clearTimeout(syncTimer.current)
+      window.clearTimeout(taxSyncTimer.current)
       window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthChange)
       window.removeEventListener(OBCP_LOCAL_DATA_CHANGED_EVENT, handleLocalChange)
       window.removeEventListener(OBCP_SYNC_STATUS_CHANGED_EVENT, handleSyncStatusChange)
+      window.removeEventListener(TAX_DATA_CHANGED_EVENT, handleTaxLocalChange)
+      window.removeEventListener(TAX_SYNC_STATUS_CHANGED_EVENT, handleTaxSyncStatusChange)
       window.removeEventListener(USER_SIGN_OUT_REQUEST_EVENT, handleSignOutRequest)
     }
   }, [])
@@ -170,6 +205,13 @@ export function UserSyncStatus() {
           throw new ObcpSyncError(error.message, true)
         }
       }
+      try {
+        await syncTaxQuestionData(activeSession)
+      } catch (error) {
+        if (error instanceof TaxQuestionSyncError && error.requiresLogin) {
+          throw new ObcpSyncError(error.message, true)
+        }
+      }
       setPendingCount(getPendingObcpRecordCount(LOCAL_USER_ID))
       updateObcpSyncStatus({
         loggedIn: true,
@@ -189,6 +231,19 @@ export function UserSyncStatus() {
         lastError: syncError.message,
       })
       if (syncError.requiresLogin) {
+        sessionRef.current = null
+        setSession(null)
+        clearExpiredSession()
+      }
+    }
+  }
+
+  async function runTaxSync(activeSession = sessionRef.current) {
+    if (!activeSession) return
+    try {
+      await syncTaxQuestionData(activeSession)
+    } catch (error) {
+      if (error instanceof TaxQuestionSyncError && error.requiresLogin) {
         sessionRef.current = null
         setSession(null)
         clearExpiredSession()
@@ -261,6 +316,7 @@ export function UserSyncStatus() {
     setSyncStatus(clearObcpSyncAccount())
     clearCustomQuestionSyncAccount(loadCustomObcpQuestions().length)
     clearTroubleshootingCaseSyncAccount(loadCustomTroubleshootingCases().length)
+    setTaxSyncStatus(clearTaxSyncAccount())
   }
 
   if (!isSupabaseConfigured) {
@@ -361,6 +417,25 @@ export function UserSyncStatus() {
                 <DiagnosticRow label="本地待同步记录" value={`${pendingCount} 条`} />
                 <DiagnosticRow label="最近同步时间" value={formatSyncTime(syncStatus.lastSyncAt)} />
                 <DiagnosticRow label="最近同步错误" value={syncStatus.lastError ?? '无'} />
+              </dl>
+            </section>
+
+            <section className="mt-5 border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-ink">税务师同步诊断</h3>
+                <button type="button" disabled={taxSyncStatus.state === 'syncing'} onClick={() => void runTaxSync()} className="text-xs font-semibold text-emerald-700 disabled:opacity-40">
+                  {taxSyncStatus.state === 'syncing' ? '同步中' : '同步税务师数据'}
+                </button>
+              </div>
+              <dl className="mt-3 space-y-2 text-xs">
+                <DiagnosticRow label="Supabase 配置" value={taxSyncStatus.configured ? '已配置' : '未配置'} />
+                <DiagnosticRow label="当前登录" value={taxSyncStatus.loggedIn ? '是' : '否'} />
+                <DiagnosticRow label="本地税务师题数" value={`${taxSyncStatus.localQuestionCount} 题`} />
+                <DiagnosticRow label="云端税务师题数" value={`${taxSyncStatus.cloudQuestionCount} 题`} />
+                <DiagnosticRow label="本地答题记录" value={`${taxSyncStatus.localRecordCount} 条`} />
+                <DiagnosticRow label="云端答题记录" value={`${taxSyncStatus.cloudRecordCount} 条`} />
+                <DiagnosticRow label="最近税务师同步" value={formatSyncTime(taxSyncStatus.lastSyncAt)} />
+                <DiagnosticRow label="最近税务师错误" value={taxSyncStatus.lastError ?? '无'} />
               </dl>
             </section>
           </div>
